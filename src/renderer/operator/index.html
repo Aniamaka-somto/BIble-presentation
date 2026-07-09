@@ -1377,7 +1377,7 @@
             </div>
             <div class="stage-foot">
               <div class="navctl">
-                <div class="navbtn">
+                <div class="navbtn" id="prevBtn">
                   <svg viewBox="0 0 24 24" fill="none">
                     <path
                       d="m15 18-6-6 6-6"
@@ -1388,7 +1388,7 @@
                   </svg>
                 </div>
                 <span class="navlabel" id="navLabel">verse 17 of 80</span>
-                <div class="navbtn">
+                <div class="navbtn" id="nextBtn">
                   <svg viewBox="0 0 24 24" fill="none">
                     <path
                       d="m9 18 6-6-6-6"
@@ -1829,6 +1829,51 @@
 
       loadChapter("Luke", 1, 17);
 
+      // Loads a chapter and stages the verse — no live marking, filmstrip scrolls to it.
+      async function loadAndStage(book, chapter, verse) {
+        await loadChapter(book, chapter, verse);
+        document.querySelectorAll(".vcard").forEach((c) => {
+          c.classList.remove("is-live");
+          const num = parseInt(c.querySelector(".vnum").textContent.replace(/\D/g, ""));
+          c.classList.toggle("is-staged", num === verse);
+        });
+        setStageState(false);
+        const card = document.querySelector(".vcard.is-staged");
+        if (card) card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      }
+
+      // ---- Prev/next arrows step through the chapter, staging each verse. ----
+      function stepToVerse(targetNum) {
+        const v = verseData[targetNum];
+        if (!v) return;
+        stagedVerse = v;
+        document.querySelectorAll(".vcard").forEach((c) => {
+          const num = parseInt(c.querySelector(".vnum").textContent.replace(/\D/g, ""));
+          c.classList.remove("is-staged");
+          if (num === targetNum && !c.classList.contains("is-live")) c.classList.add("is-staged");
+        });
+        loadVerseIntoStage(v);
+        setStageState(false);
+        const cardEl = Array.from(document.querySelectorAll(".vcard")).find(
+          (c) => parseInt(c.querySelector(".vnum").textContent.replace(/\D/g, "")) === targetNum
+        );
+        if (cardEl) cardEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      }
+
+      document.getElementById("prevBtn").addEventListener("click", () => {
+        if (!stagedVerse) return;
+        const keys = Object.keys(verseData).map(Number).sort((a, b) => a - b);
+        const idx = keys.indexOf(stagedVerse.n);
+        if (idx > 0) stepToVerse(keys[idx - 1]);
+      });
+
+      document.getElementById("nextBtn").addEventListener("click", () => {
+        if (!stagedVerse) return;
+        const keys = Object.keys(verseData).map(Number).sort((a, b) => a - b);
+        const idx = keys.indexOf(stagedVerse.n);
+        if (idx < keys.length - 1) stepToVerse(keys[idx + 1]);
+      });
+
       // Left library list — clicking a row loads that chapter.
       document.getElementById("libList").addEventListener("click", (e) => {
         const row = e.target.closest(".lib-row");
@@ -1862,11 +1907,9 @@
           }
           const key = match[1].trim().toLowerCase().replace(/\s+/g, "");
           const book = bookAliases[key] || match[1].trim();
-          loadChapter(
-            book,
-            parseInt(match[2], 10),
-            match[3] ? parseInt(match[3], 10) : 1,
-          );
+          const chapter = parseInt(match[2], 10);
+          const verse = match[3] ? parseInt(match[3], 10) : 1;
+          loadAndStage(book, chapter, verse);
           e.target.style.borderColor = "";
         });
 
@@ -2105,8 +2148,7 @@
           '<div class="card-actions"><div class="mini-btn">Preview</div><div class="mini-btn primary">Push live</div></div>';
         const [previewBtn, pushBtn] = card.querySelectorAll(".mini-btn");
         previewBtn.addEventListener("click", async () => {
-          await loadChapter(book, chapter, verse);
-          setStageState(false);
+          await loadAndStage(book, chapter, verse);
         });
         pushBtn.addEventListener("click", async () => {
           await loadChapter(book, chapter, verse);
@@ -2295,7 +2337,7 @@
               r.text +
               "</div>";
             row.addEventListener("click", () =>
-              loadChapter(r.book, r.chapter, r.verse),
+              loadAndStage(r.book, r.chapter, r.verse),
             );
             searchResultsEl.appendChild(row);
           });
@@ -2313,7 +2355,10 @@
             (c) =>
               parseInt(c.querySelector(".vnum").textContent) === stagedVerse.n,
           );
-          if (card) card.classList.add("is-live");
+          if (card) {
+            card.classList.add("is-live");
+            card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+          }
         }
         setStageState(true);
         document.getElementById("splitLiveVerse").innerHTML =
