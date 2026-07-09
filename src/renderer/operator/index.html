@@ -1,0 +1,2340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Scripture Caster — Operator Console</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-0: #0a0b0f;
+        --bg-1: #101218;
+        --bg-2: #15171f;
+        --bg-3: #1b1e28;
+        --bg-4: #22252f;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-soft: rgba(255, 255, 255, 0.05);
+        --text-hi: #f1f2f7;
+        --text-mid: #aeb4c4;
+        --text-lo: #6a7086;
+        --blue: #5b7fff;
+        --blue-2: #8aa2ff;
+        --blue-deep: #22305e;
+        --live-red: #ff5470;
+        --gold: #dcb87e;
+        --radius-lg: 16px;
+        --radius-md: 11px;
+        --radius-sm: 8px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg-0);
+        color: var(--text-hi);
+        font-family: "Inter", sans-serif;
+        height: 100%;
+        overflow: hidden;
+      }
+      button {
+        font-family: inherit;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--bg-4);
+        border-radius: 8px;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr) 300px;
+        grid-template-rows: 56px minmax(0, 1fr);
+        grid-template-areas: "topbar topbar topbar" "left center right";
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+      }
+
+      /* ============ TOP BAR ============ */
+      .topbar {
+        grid-area: topbar;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bg-1);
+        gap: 14px;
+      }
+      .tb-cluster {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tb-divider {
+        width: 1px;
+        height: 24px;
+        background: var(--line);
+        margin: 0 4px;
+      }
+      .app-title {
+        font-size: 14.5px;
+        font-weight: 600;
+      }
+      .app-title span {
+        color: var(--text-lo);
+        font-weight: 500;
+      }
+
+      .tb-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-mid);
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      .tb-icon:hover {
+        background: var(--bg-3);
+        color: var(--text-hi);
+      }
+      .tb-icon svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .segmented-sm {
+        display: flex;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 3px;
+        gap: 2px;
+      }
+      .segmented-sm button {
+        border: none;
+        background: transparent;
+        color: var(--text-lo);
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 6px 13px;
+        border-radius: 18px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .segmented-sm button.on {
+        background: var(--bg-4);
+        color: var(--text-hi);
+      }
+
+      .session-chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--text-mid);
+        font-family: "JetBrains Mono", monospace;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        padding: 6px 12px;
+        border-radius: 20px;
+      }
+      .dot-pulse {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--blue-2);
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      .lbc-cluster {
+        display: flex;
+        gap: 5px;
+      }
+      .lbc-btn {
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        color: var(--text-mid);
+      }
+      .lbc-btn:hover {
+        color: var(--text-hi);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .lbc-btn.active {
+        background: var(--blue-deep);
+        color: var(--blue-2);
+        border-color: rgba(91, 127, 255, 0.5);
+      }
+
+      .alerts-btn {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--text-mid);
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        padding: 7px 13px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .alerts-btn:hover {
+        color: var(--text-hi);
+      }
+      .alerts-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .live-pill {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        padding: 7px 14px 7px 11px;
+        border-radius: 20px;
+        background: rgba(255, 84, 112, 0.13);
+        border: 1px solid rgba(255, 84, 112, 0.4);
+        color: #ff8298;
+        cursor: pointer;
+      }
+      .live-pill.off {
+        background: var(--bg-2);
+        border-color: var(--line);
+        color: var(--text-lo);
+      }
+      .live-pill .rdot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--live-red);
+        animation: pulse 1.6s infinite;
+      }
+      .live-pill.off .rdot {
+        background: var(--text-lo);
+        animation: none;
+      }
+
+      /* ============ LEFT: SCHEDULE + LIBRARY ============ */
+      .left-col {
+        grid-area: left;
+        border-right: 1px solid var(--line);
+        background: var(--bg-1);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 14px 10px;
+        flex-shrink: 0;
+      }
+      .panel-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--text-lo);
+      }
+      .add-btn {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        color: var(--text-mid);
+        cursor: pointer;
+      }
+      .add-btn:hover {
+        color: var(--text-hi);
+      }
+      .add-btn svg {
+        width: 13px;
+        height: 13px;
+      }
+
+      .schedule-list {
+        flex: 1 1 38%;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 10px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .sched-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px;
+        border-radius: 9px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .sched-item:hover {
+        background: var(--bg-2);
+      }
+      .sched-item.active {
+        background: var(--bg-3);
+        border-color: rgba(91, 127, 255, 0.35);
+      }
+      .sched-item.is-live {
+        border-color: rgba(255, 84, 112, 0.45);
+      }
+      .sched-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-3);
+        color: var(--text-mid);
+      }
+      .sched-icon svg {
+        width: 14px;
+        height: 14px;
+      }
+      .sched-item.active .sched-icon {
+        color: var(--blue-2);
+      }
+      .sched-body {
+        min-width: 0;
+        flex: 1;
+      }
+      .sched-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-hi);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sched-sub {
+        font-size: 11px;
+        color: var(--text-lo);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sched-live-tag {
+        font-size: 9.5px;
+        font-weight: 700;
+        color: #ff8298;
+        background: rgba(255, 84, 112, 0.15);
+        border: 1px solid rgba(255, 84, 112, 0.3);
+        padding: 2px 6px;
+        border-radius: 5px;
+        flex-shrink: 0;
+      }
+
+      .resource-lib {
+        flex: 1 1 62%;
+        min-height: 0;
+        border-top: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-0);
+      }
+      .lib-tabs {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        padding: 11px 10px 0;
+        flex-shrink: 0;
+      }
+      .lib-tab {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-lo);
+        padding: 8px 11px;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        white-space: nowrap;
+        border-bottom: 2px solid transparent;
+      }
+      .lib-tab.primary {
+        font-weight: 700;
+      }
+      .lib-tab:hover {
+        color: var(--text-mid);
+      }
+      .lib-tab.on {
+        color: var(--blue-2);
+        border-bottom-color: var(--blue);
+        background: var(--bg-1);
+      }
+      .lib-more {
+        margin-left: auto;
+        font-size: 11px;
+        color: var(--text-lo);
+        padding: 8px 4px;
+        cursor: pointer;
+      }
+      .lib-more:hover {
+        color: var(--text-mid);
+      }
+      .lib-overflow {
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        padding: 4px 10px 8px;
+      }
+      .lib-overflow.show {
+        display: flex;
+      }
+      .lib-overflow .lib-tab {
+        border-radius: 8px;
+        border-bottom: none;
+      }
+
+      .lib-search {
+        margin: 9px 10px 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 11px;
+        flex-shrink: 0;
+      }
+      .lib-search svg {
+        width: 13px;
+        height: 13px;
+        color: var(--text-lo);
+        flex-shrink: 0;
+      }
+      .lib-search input {
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--text-hi);
+        font-size: 13px;
+        width: 100%;
+      }
+      .lib-search input::placeholder {
+        color: var(--text-lo);
+      }
+
+      .lib-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .lib-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 9px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .lib-row:hover {
+        background: var(--bg-2);
+      }
+      .lib-row-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-mid);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .lib-row:hover .lib-row-title {
+        color: var(--text-hi);
+      }
+      .lib-row-sub {
+        font-size: 11px;
+        color: var(--text-lo);
+      }
+
+      /* ============ CENTER: STAGE ============ */
+      .center-col {
+        grid-area: center;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        padding: 16px 20px;
+        gap: 12px;
+        overflow: hidden;
+      }
+
+      .stage-wrap {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        overflow: hidden;
+        transition: background 0.15s ease;
+      }
+      .stage-wrap.blacked {
+        background: #000;
+        border-color: #000;
+      }
+      .stage-wrap.blacked .stage {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .stage {
+        position: relative;
+        height: 100%;
+        min-height: 0;
+        border-radius: var(--radius-lg);
+        background: var(--bg-2);
+        display: flex;
+        flex-direction: column;
+        padding: 20px 30px 18px;
+        overflow: hidden;
+      }
+
+      .stage-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+      .state-tag {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+        color: var(--blue-2);
+        background: rgba(91, 127, 255, 0.12);
+        border: 1px solid rgba(91, 127, 255, 0.3);
+        padding: 7px 14px;
+        border-radius: 20px;
+      }
+      .state-tag .state-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--blue-2);
+      }
+      .state-tag.is-live {
+        color: #ff8298;
+        background: rgba(255, 84, 112, 0.13);
+        border-color: rgba(255, 84, 112, 0.35);
+      }
+      .state-tag.is-live .state-dot {
+        background: var(--live-red);
+        animation: pulsered 1.6s infinite;
+      }
+
+      .stage-ref-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .stage-ref {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: var(--text-mid);
+      }
+      .kjv-tag {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: var(--blue-2);
+        background: var(--blue-deep);
+        border: 1px solid rgba(91, 127, 255, 0.35);
+        padding: 3px 7px;
+        border-radius: 5px;
+      }
+
+      .stage-body {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 8px 16px;
+        overflow: hidden;
+      }
+      .stage-verse {
+        max-width: 640px;
+        font-family: "Fraunces", serif;
+        font-weight: 500;
+        font-size: clamp(17px, 2vw, 27px);
+        line-height: 1.45;
+        color: var(--text-hi);
+      }
+      .stage-verse .num {
+        font-size: 0.5em;
+        vertical-align: super;
+        color: var(--blue-2);
+        font-family: "Inter";
+        font-weight: 700;
+        margin-right: 4px;
+      }
+      .stage-cite {
+        margin-top: 16px;
+        font-size: 14px;
+        color: var(--text-mid);
+        font-style: italic;
+        font-family: "Fraunces", serif;
+      }
+
+      .stage-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+      .navctl {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .navbtn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        color: var(--text-mid);
+        cursor: pointer;
+      }
+      .navbtn:hover {
+        color: var(--text-hi);
+      }
+      .navbtn svg {
+        width: 14px;
+        height: 14px;
+      }
+      .navlabel {
+        font-size: 13px;
+        color: var(--text-lo);
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .push-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      /* split output mode — two real panes for churches with two physical outputs */
+      .split-stage {
+        display: none;
+        height: 100%;
+        gap: 12px;
+      }
+      .split-pane {
+        flex: 1;
+        border-radius: var(--radius-md);
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .split-pane.live-pane {
+        border-color: rgba(255, 84, 112, 0.4);
+      }
+      .split-pane-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 13px;
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+      }
+      .split-pane-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        color: var(--text-lo);
+      }
+      .split-pane.live-pane .split-pane-label {
+        color: #ff8298;
+      }
+      .split-pane-body {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 16px;
+        overflow: hidden;
+      }
+      .split-verse {
+        font-family: "Fraunces", serif;
+        font-size: clamp(14px, 1.5vw, 19px);
+        line-height: 1.45;
+        color: var(--text-hi);
+        max-width: 90%;
+      }
+      .split-verse .num {
+        font-size: 0.55em;
+        vertical-align: super;
+        color: var(--blue-2);
+        font-weight: 700;
+        font-family: "Inter";
+      }
+
+      .app.split-mode .stage {
+        display: none;
+      }
+      .app.split-mode .split-stage {
+        display: flex;
+      }
+      .btn {
+        font-size: 13px;
+        font-weight: 600;
+        padding: 9px 16px;
+        border-radius: 9px;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .btn-ghost {
+        background: var(--bg-3);
+        color: var(--text-mid);
+      }
+      .btn-ghost:hover {
+        color: var(--text-hi);
+      }
+      .btn-live {
+        background: var(--live-red);
+        color: #fff;
+        border: none;
+      }
+
+      .filmstrip-wrap {
+        flex-shrink: 0;
+      }
+      .filmstrip-label {
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        color: var(--text-lo);
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 8px;
+      }
+      .filmstrip-label .chap {
+        color: var(--text-mid);
+      }
+      .filmstrip {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        padding-bottom: 3px;
+      }
+      .vcard {
+        flex: 0 0 168px;
+        background: var(--bg-1);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        padding: 11px 12px;
+        cursor: pointer;
+        position: relative;
+      }
+      .vcard:hover {
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      .vcard.is-live {
+        border-color: var(--live-red);
+      }
+      .vcard.is-staged {
+        border-color: var(--blue-2);
+        background: var(--bg-3);
+      }
+      .vcard.is-suggested {
+        border-color: var(--blue);
+      }
+      .vcard .vnum {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11.5px;
+        color: var(--text-lo);
+        font-weight: 600;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .vcard.is-live .vnum {
+        color: #ff8298;
+      }
+      .vcard .vtext {
+        font-family: "Fraunces", serif;
+        font-size: 13px;
+        line-height: 1.42;
+        color: var(--text-mid);
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .vcard.is-live .vtext {
+        color: var(--text-hi);
+      }
+      .ai-flag {
+        position: absolute;
+        top: 9px;
+        right: 9px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--blue);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .ai-flag svg {
+        width: 8px;
+        height: 8px;
+      }
+
+      .transcript {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--bg-1);
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        padding: 10px 16px;
+      }
+      .transcript-tag {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        color: var(--text-lo);
+        flex-shrink: 0;
+        padding-right: 12px;
+        border-right: 1px solid var(--line);
+      }
+      .transcript-text {
+        flex: 1;
+        min-width: 0;
+        font-size: 13.5px;
+        color: var(--text-mid);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .transcript-caret {
+        display: inline-block;
+        width: 2px;
+        height: 13px;
+        background: var(--blue-2);
+        margin-left: 2px;
+        vertical-align: -2px;
+        animation: blink 1s steps(1) infinite;
+      }
+      @keyframes blink {
+        0%,
+        49% {
+          opacity: 1;
+        }
+        50%,
+        100% {
+          opacity: 0;
+        }
+      }
+
+      /* ============ RIGHT: ASSISTANT ============ */
+      .assistant {
+        grid-area: right;
+        border-left: 1px solid var(--line);
+        background: var(--bg-1);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .asst-head {
+        padding: 15px 16px 11px;
+        border-bottom: 1px solid var(--line);
+        flex-shrink: 0;
+      }
+      .asst-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .asst-title svg {
+        width: 15px;
+        height: 15px;
+        color: var(--blue-2);
+      }
+      .asst-sub {
+        font-size: 12px;
+        color: var(--text-lo);
+        margin-top: 4px;
+      }
+      .asst-search {
+        margin: 13px 16px 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 9px 11px;
+        flex-shrink: 0;
+      }
+      .asst-search svg {
+        width: 14px;
+        height: 14px;
+        color: var(--text-lo);
+        flex-shrink: 0;
+      }
+      .asst-search input {
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--text-hi);
+        font-size: 13px;
+        width: 100%;
+      }
+      .asst-search input::placeholder {
+        color: var(--text-lo);
+      }
+      .asst-feed {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .feed-time {
+        font-size: 10.5px;
+        color: var(--text-lo);
+        font-family: "JetBrains Mono", monospace;
+        text-align: center;
+        margin: 6px 0 1px;
+        letter-spacing: 0.4px;
+      }
+      .card {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        padding: 12px 13px;
+      }
+      .card.top {
+        border-color: var(--blue);
+        background: var(--bg-3);
+      }
+      .card-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 7px;
+      }
+      .card-ref {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-hi);
+      }
+      .tag {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        padding: 3px 6px;
+        border-radius: 5px;
+        text-transform: uppercase;
+      }
+      .tag.explicit {
+        background: var(--blue-deep);
+        color: var(--blue-2);
+        border: 1px solid rgba(91, 127, 255, 0.35);
+      }
+      .tag.paraphrase {
+        background: rgba(220, 184, 126, 0.14);
+        color: var(--gold);
+        border: 1px solid rgba(220, 184, 126, 0.35);
+      }
+      .card-snip {
+        font-family: "Fraunces", serif;
+        font-size: 13px;
+        color: var(--text-mid);
+        line-height: 1.48;
+        margin-bottom: 10px;
+      }
+      .card-actions {
+        display: flex;
+        gap: 7px;
+      }
+      .mini-btn {
+        flex: 1;
+        text-align: center;
+        font-size: 11.5px;
+        font-weight: 600;
+        padding: 7px 0;
+        border-radius: 7px;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        color: var(--text-mid);
+        background: var(--bg-3);
+      }
+      .mini-btn:hover {
+        color: var(--text-hi);
+      }
+      .mini-btn.primary {
+        background: var(--blue);
+        color: #fff;
+        border: none;
+      }
+      .mini-btn.primary:hover {
+        background: var(--blue-2);
+      }
+      .feed-note {
+        font-size: 12px;
+        color: var(--text-lo);
+        text-align: center;
+        padding: 2px 6px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        justify-content: center;
+      }
+      .feed-note svg {
+        width: 11px;
+        height: 11px;
+      }
+
+      /* alerts overlay */
+      .alerts-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(5, 6, 10, 0.65);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+      .alerts-overlay.show {
+        display: flex;
+      }
+      .alerts-modal {
+        width: 400px;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+      }
+      .alerts-modal h3 {
+        font-size: 15px;
+        margin-bottom: 5px;
+      }
+      .alerts-modal p {
+        font-size: 13px;
+        color: var(--text-lo);
+        margin-bottom: 15px;
+      }
+      .alerts-modal textarea {
+        width: 100%;
+        height: 72px;
+        background: var(--bg-1);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        color: var(--text-hi);
+        font-size: 13.5px;
+        padding: 11px;
+        resize: none;
+        outline: none;
+        font-family: "Inter";
+      }
+      .alerts-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" id="app">
+      <!-- TOP BAR -->
+      <div class="topbar">
+        <div class="tb-cluster">
+          <div class="tb-icon" title="New schedule">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 5v14M5 12h14"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+          <div class="tb-icon" title="Open schedule">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <div class="tb-divider"></div>
+          <div class="app-title">
+            Scripture Caster <span>· Sunday Service</span>
+          </div>
+        </div>
+
+        <div class="tb-cluster">
+          <span
+            style="
+              font-size: 11px;
+              color: var(--text-lo);
+              font-weight: 600;
+              letter-spacing: 0.4px;
+            "
+            >OUTPUT</span
+          >
+          <div class="segmented-sm" id="outputModeToggle">
+            <button class="on" data-mode="combined">Combined</button>
+            <button data-mode="split">Split screens</button>
+          </div>
+          <div class="tb-divider"></div>
+          <div class="session-chip">
+            <div class="dot-pulse"></div>
+            34:12
+          </div>
+        </div>
+
+        <div class="tb-cluster">
+          <div class="alerts-btn" id="alertsBtn">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2C8 2 6 5 6 9v4l-2 3h16l-2-3V9c0-4-2-7-6-7z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Alerts
+          </div>
+          <div class="lbc-cluster">
+            <div class="lbc-btn" id="logoBtn">LOGO</div>
+            <div class="lbc-btn" id="blackBtn">BLACK</div>
+            <div class="lbc-btn" id="clearBtn">CLEAR</div>
+          </div>
+          <div class="tb-divider"></div>
+          <div class="live-pill" id="liveToggle">
+            <div class="rdot"></div>
+            <span id="liveLabel">ON AIR</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEFT: SCHEDULE + LIBRARY -->
+      <div class="left-col">
+        <div class="panel-head">
+          <span class="panel-title">Order of service</span>
+          <div class="add-btn">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 5v14M5 12h14"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+        <div class="schedule-list">
+          <div class="sched-item">
+            <div class="sched-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 18V5l12-2v13"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+                <circle
+                  cx="6"
+                  cy="18"
+                  r="3"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+              </svg>
+            </div>
+            <div class="sched-body">
+              <div class="sched-name">Opening worship</div>
+              <div class="sched-sub">4 songs</div>
+            </div>
+          </div>
+          <div class="sched-item active is-live">
+            <div class="sched-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 19.5A2.5 2.5 0 016.5 17H20V4a2 2 0 00-2-2h-11.5A2.5 2.5 0 004 4.5v15Z"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+              </svg>
+            </div>
+            <div class="sched-body">
+              <div class="sched-name">Sermon — Luke 1</div>
+              <div class="sched-sub">AI detection active</div>
+            </div>
+            <span class="sched-live-tag">LIVE</span>
+          </div>
+          <div class="sched-item">
+            <div class="sched-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 18V5l12-2v13"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+                <circle
+                  cx="6"
+                  cy="18"
+                  r="3"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+              </svg>
+            </div>
+            <div class="sched-body">
+              <div class="sched-name">Closing worship</div>
+              <div class="sched-sub">2 songs</div>
+            </div>
+          </div>
+          <div class="sched-item">
+            <div class="sched-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <rect
+                  x="3"
+                  y="3"
+                  width="18"
+                  height="18"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+              </svg>
+            </div>
+            <div class="sched-body">
+              <div class="sched-name">Announcements</div>
+              <div class="sched-sub">3 slides</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="resource-lib">
+          <div class="lib-tabs">
+            <div class="lib-tab primary on" data-tab="scripture">Scripture</div>
+            <div class="lib-tab" data-tab="songs">Songs</div>
+            <div class="lib-more" id="libMoreBtn">More ⌄</div>
+          </div>
+          <div class="lib-overflow" id="libOverflow">
+            <div class="lib-tab" data-tab="media">Media</div>
+            <div class="lib-tab" data-tab="web">Web</div>
+            <div class="lib-tab" data-tab="themes">Backgrounds</div>
+          </div>
+          <div class="lib-search">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="11"
+                cy="11"
+                r="7"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <path
+                d="M20 20l-3.5-3.5"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+            </svg>
+            <input
+              type="text"
+              id="libSearchInput"
+              placeholder="Reference only — e.g. John 3:16"
+            />
+          </div>
+          <div class="lib-list" id="libList">
+            <div class="lib-row" data-book="Luke" data-chapter="1">
+              <div>
+                <div class="lib-row-title">Luke 1</div>
+                <div class="lib-row-sub">80 verses</div>
+              </div>
+            </div>
+            <div class="lib-row" data-book="Romans" data-chapter="8">
+              <div>
+                <div class="lib-row-title">Romans 8</div>
+                <div class="lib-row-sub">39 verses</div>
+              </div>
+            </div>
+            <div class="lib-row" data-book="Psalms" data-chapter="23">
+              <div>
+                <div class="lib-row-title">Psalm 23</div>
+                <div class="lib-row-sub">6 verses</div>
+              </div>
+            </div>
+            <div class="lib-row" data-book="Hebrews" data-chapter="11">
+              <div>
+                <div class="lib-row-title">Hebrews 11</div>
+                <div class="lib-row-sub">40 verses</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTER: STAGE -->
+      <div class="center-col">
+        <div class="stage-wrap" id="stageWrap">
+          <div class="stage" id="stage">
+            <div class="stage-head">
+              <div class="state-tag is-live" id="stateTag">
+                <span class="state-dot"></span>LIVE — on screen now
+              </div>
+              <div class="stage-ref-row">
+                <span class="stage-ref" id="stageRef">LUKE 1:17</span>
+                <span class="kjv-tag">KJV</span>
+              </div>
+            </div>
+            <div class="stage-body">
+              <div>
+                <div class="stage-verse" id="stageVerse">
+                  <span class="num">17</span>And he shall go before him in the
+                  spirit and power of Elias, to turn the hearts of the fathers
+                  to the children, and the disobedient to the wisdom of the
+                  just; to make ready a people prepared for the Lord.
+                </div>
+                <div class="stage-cite" id="stageCite">
+                  Luke 1:17 · King James Version
+                </div>
+              </div>
+            </div>
+            <div class="stage-foot">
+              <div class="navctl">
+                <div class="navbtn">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="m15 18-6-6 6-6"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </div>
+                <span class="navlabel" id="navLabel">verse 17 of 80</span>
+                <div class="navbtn">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="m9 18 6-6-6-6"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div class="push-actions">
+                <div class="btn btn-live" id="pushLiveBtn">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M4.9 4.9a10 10 0 000 14.2M19.1 4.9a10 10 0 010 14.2M8 8a5 5 0 000 8M16 8a5 5 0 010 8"
+                    />
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor" /></svg
+                  >Push live
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="split-stage">
+            <div class="split-pane">
+              <div class="split-pane-head">
+                <span class="split-pane-label">Preview — next up</span>
+              </div>
+              <div class="split-pane-body">
+                <div class="split-verse" id="splitPreviewVerse">
+                  <span class="num">18</span>And Zacharias said unto the angel,
+                  Whereby shall I know this? For I am an old man.
+                </div>
+              </div>
+            </div>
+            <div class="split-pane live-pane">
+              <div class="split-pane-head">
+                <span class="split-pane-label">Live — on screen now</span>
+              </div>
+              <div class="split-pane-body">
+                <div class="split-verse" id="splitLiveVerse">
+                  <span class="num">17</span>He will also go before Him in the
+                  spirit and power of Elijah.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filmstrip-wrap">
+          <div class="filmstrip-label">
+            <span class="chap">Luke 1</span><span>10 of 80 shown</span>
+          </div>
+          <div class="filmstrip" id="filmstrip">
+            <div class="vcard">
+              <div class="vnum">15</div>
+              <div class="vtext">
+                For he will be great in the sight of the Lord, and shall drink
+                neither wine nor strong drink.
+              </div>
+            </div>
+            <div class="vcard">
+              <div class="vnum">16</div>
+              <div class="vtext">
+                And he will turn many of the children of Israel to the Lord
+                their God.
+              </div>
+            </div>
+            <div class="vcard is-live">
+              <div class="vnum">17 · live</div>
+              <div class="vtext">
+                He will also go before Him in the spirit and power of Elijah, to
+                turn the hearts of the fathers.
+              </div>
+            </div>
+            <div class="vcard is-suggested">
+              <div class="vnum">18</div>
+              <div class="vtext">
+                And Zacharias said to the angel, "How shall I know this? For I
+                am an old man..."
+              </div>
+              <div class="ai-flag">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  stroke-width="2.5"
+                >
+                  <path
+                    d="M12 2 9.1 8.6 2 9.3l5.5 4.7L5.8 21 12 17.3 18.2 21l-1.7-7 5.5-4.7-7.1-.7Z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div class="vcard">
+              <div class="vnum">19</div>
+              <div class="vtext">
+                And the angel answered, "I am Gabriel, who stands in the
+                presence of God..."
+              </div>
+            </div>
+            <div class="vcard">
+              <div class="vnum">20</div>
+              <div class="vtext">
+                But behold, you will be mute and not able to speak until the day
+                these things take place...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="transcript">
+          <div class="transcript-tag" id="listenToggle" style="cursor: pointer">
+            <div
+              class="dot-pulse"
+              id="listenDot"
+              style="animation: none; background: var(--text-lo)"
+            ></div>
+            <span id="listenLabel">Start listening</span>
+          </div>
+          <div class="transcript-text" id="transcriptText">
+            Click "Start listening" to begin real-time detection<span
+              class="transcript-caret"
+            ></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: ASSISTANT -->
+      <div class="assistant">
+        <div class="asst-head">
+          <div class="asst-title">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M12 2 9.1 8.6 2 9.3l5.5 4.7L5.8 21 12 17.3 18.2 21l-1.7-7 5.5-4.7-7.1-.7Z"
+              /></svg
+            >Detection
+          </div>
+          <div class="asst-sub">Listening · suggests, never pushes</div>
+        </div>
+        <div class="asst-search">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle
+              cx="11"
+              cy="11"
+              r="7"
+              stroke="currentColor"
+              stroke-width="1.8"
+            />
+            <path
+              d="M20 20l-3.5-3.5"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Jump to a passage — e.g. Romans 8:28"
+          />
+        </div>
+        <div id="searchResults"></div>
+        <div class="asst-feed">
+          <div class="feed-time">2 SEC AGO</div>
+          <div class="card top">
+            <div class="card-row">
+              <span class="card-ref">Luke 1:18</span
+              ><span class="tag explicit">Next likely</span>
+            </div>
+            <div class="card-snip">
+              "...and Zacharias said unto the angel, whereby shall I know
+              this?..."
+            </div>
+            <div class="card-actions">
+              <div class="mini-btn">Preview</div>
+              <div class="mini-btn primary">Push live</div>
+            </div>
+          </div>
+          <div class="feed-time">41 SEC AGO</div>
+          <div class="card">
+            <div class="card-row">
+              <span class="card-ref">Jeremiah 29:11</span
+              ><span class="tag paraphrase">Paraphrase · 82%</span>
+            </div>
+            <div class="card-snip">
+              Pastor said: "I know the plans I have for you..."
+            </div>
+            <div class="card-actions">
+              <div class="mini-btn">Preview</div>
+              <div class="mini-btn primary">Push live</div>
+            </div>
+          </div>
+          <div class="feed-note">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <path
+                d="M12 8v5M12 16h.01"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              /></svg
+            >Nothing pushes without you
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alerts-overlay" id="alertsOverlay">
+      <div class="alerts-modal">
+        <h3>Send an alert</h3>
+        <p>Shows a message banner on the live output for a few seconds.</p>
+        <textarea placeholder="e.g. Nursery pickup — ticket #42"></textarea>
+        <div class="alerts-modal-actions">
+          <div class="btn btn-ghost" id="alertsCancel">Cancel</div>
+          <div
+            class="btn"
+            style="background: var(--blue); color: #fff; border: none"
+          >
+            Send alert
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="alerts-overlay" id="dgKeyOverlay">
+      <div class="alerts-modal">
+        <h3>Deepgram API key</h3>
+        <p>
+          Needed to start real-time listening. Stored only for this session.
+        </p>
+        <input
+          type="text"
+          id="dgKeyInput"
+          placeholder="Paste your API key"
+          style="
+            width: 100%;
+            background: var(--bg-1);
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            color: var(--text-hi);
+            font-size: 13.5px;
+            padding: 11px;
+            outline: none;
+            font-family: &quot;JetBrains Mono&quot;, monospace;
+          "
+        />
+        <div class="alerts-modal-actions">
+          <div class="btn btn-ghost" id="dgKeyCancel">Cancel</div>
+          <div
+            class="btn"
+            id="dgKeySave"
+            style="background: var(--blue); color: #fff; border: none"
+          >
+            Save & start
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document
+        .getElementById("outputModeToggle")
+        .addEventListener("click", (e) => {
+          const btn = e.target.closest("button");
+          if (!btn) return;
+          document
+            .querySelectorAll("#outputModeToggle button")
+            .forEach((b) => b.classList.remove("on"));
+          btn.classList.add("on");
+          document
+            .getElementById("app")
+            .classList.toggle("split-mode", btn.dataset.mode === "split");
+        });
+
+      const lbc = {
+        logo: document.getElementById("logoBtn"),
+        black: document.getElementById("blackBtn"),
+        clear: document.getElementById("clearBtn"),
+      };
+      const stageWrapEl = document.getElementById("stageWrap");
+      function applyBlankMode(mode) {
+        Object.values(lbc).forEach((x) => x.classList.remove("active"));
+        stageWrapEl.classList.toggle("blacked", mode === "black");
+        if (mode === "logo") lbc.logo.classList.add("active");
+        if (mode === "black") lbc.black.classList.add("active");
+        if (window.scriptureCaster) window.scriptureCaster.setBlankMode(mode);
+      }
+      lbc.logo.addEventListener("click", () =>
+        applyBlankMode(lbc.logo.classList.contains("active") ? "none" : "logo"),
+      );
+      lbc.black.addEventListener("click", () =>
+        applyBlankMode(
+          lbc.black.classList.contains("active") ? "none" : "black",
+        ),
+      );
+      lbc.clear.addEventListener("click", () => applyBlankMode("none"));
+      const liveToggle = document.getElementById("liveToggle");
+      liveToggle.addEventListener("click", () => {
+        const isOff = liveToggle.classList.toggle("off");
+        document.getElementById("liveLabel").textContent = isOff
+          ? "OFF AIR"
+          : "ON AIR";
+      });
+      const alertsOverlay = document.getElementById("alertsOverlay");
+      document
+        .getElementById("alertsBtn")
+        .addEventListener("click", () => alertsOverlay.classList.add("show"));
+      document
+        .getElementById("alertsCancel")
+        .addEventListener("click", () =>
+          alertsOverlay.classList.remove("show"),
+        );
+      alertsOverlay.addEventListener("click", (e) => {
+        if (e.target === alertsOverlay) alertsOverlay.classList.remove("show");
+      });
+      document
+        .getElementById("libMoreBtn")
+        .addEventListener("click", () =>
+          document.getElementById("libOverflow").classList.toggle("show"),
+        );
+      document.querySelectorAll(".lib-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".lib-tab")
+            .forEach((t) => t.classList.remove("on"));
+          tab.classList.add("on");
+        });
+      });
+      document.querySelectorAll(".sched-item").forEach((item) => {
+        item.addEventListener("click", () => {
+          document
+            .querySelectorAll(".sched-item")
+            .forEach((i) => i.classList.remove("active"));
+          item.classList.add("active");
+        });
+      });
+      let verseData = {};
+      let stagedVerse = null;
+      const stateTag = document.getElementById("stateTag");
+      const filmstripEl = document.getElementById("filmstrip");
+
+      function setStageState(isLive) {
+        stateTag.classList.toggle("is-live", isLive);
+        stateTag.innerHTML = isLive
+          ? '<span class="state-dot"></span>LIVE — on screen now'
+          : '<span class="state-dot"></span>STAGED — not yet visible';
+      }
+
+      function loadVerseIntoStage(v) {
+        document.getElementById("stageRef").textContent = v.ref;
+        document.getElementById("stageVerse").innerHTML =
+          '<span class="num">' + v.n + "</span>" + v.text;
+        document.getElementById("stageCite").textContent =
+          v.ref.replace(v.book.toUpperCase(), v.book) + " · King James Version";
+        document.getElementById("navLabel").textContent =
+          "verse " + v.n + " of " + Object.keys(verseData).length;
+        document.getElementById("splitPreviewVerse").innerHTML =
+          '<span class="num">' + v.n + "</span>" + v.text;
+      }
+
+      function attachVcardHandler(card) {
+        card.addEventListener("click", () => {
+          const num = parseInt(
+            card.querySelector(".vnum").textContent.replace(/\D/g, ""),
+          );
+          const v = verseData[num];
+          if (!v) return;
+          stagedVerse = v;
+          document
+            .querySelectorAll(".vcard")
+            .forEach((c) => c.classList.remove("is-staged"));
+          const wasLive = card.classList.contains("is-live");
+          if (!wasLive) card.classList.add("is-staged");
+          loadVerseIntoStage(v);
+          setStageState(wasLive);
+        });
+      }
+
+      function renderFilmstrip(currentVerseNum) {
+        filmstripEl.innerHTML = "";
+        Object.values(verseData).forEach((v) => {
+          const card = document.createElement("div");
+          card.className =
+            "vcard" + (v.n === currentVerseNum ? " is-live" : "");
+          card.innerHTML =
+            '<div class="vnum">' +
+            v.n +
+            (v.n === currentVerseNum ? " · live" : "") +
+            '</div><div class="vtext">' +
+            v.text +
+            "</div>";
+          attachVcardHandler(card);
+          filmstripEl.appendChild(card);
+        });
+      }
+
+      // Load the real chapter (all verses, not a hardcoded handful) from the
+      // full local KJV corpus via the main process.
+      async function loadChapter(book, chapter, startLive) {
+        const verses = await window.scriptureCaster.getChapter(book, chapter);
+        verseData = {};
+        verses.forEach((v) => {
+          verseData[v.verse] = {
+            n: v.verse,
+            text: v.text,
+            ref: (book + " " + chapter + ":" + v.verse).toUpperCase(),
+            book,
+            chapter,
+          };
+        });
+        document.querySelector(".filmstrip-label .chap").textContent =
+          book + " " + chapter;
+        document.querySelector(".filmstrip-label span:last-child").textContent =
+          verses.length + " verses";
+        renderFilmstrip(startLive);
+        stagedVerse = verseData[startLive];
+        loadVerseIntoStage(stagedVerse);
+        setStageState(true);
+      }
+
+      loadChapter("Luke", 1, 17);
+
+      // Left library list — clicking a row loads that chapter.
+      document.getElementById("libList").addEventListener("click", (e) => {
+        const row = e.target.closest(".lib-row");
+        if (!row) return;
+        loadChapter(row.dataset.book, parseInt(row.dataset.chapter), 1);
+      });
+
+      // Left library search — reference-only by design (see: two search boxes
+      // solve different problems — "I know the address" vs "I remember the words").
+      const bookAliases = {
+        ps: "Psalms",
+        psalm: "Psalms",
+        gen: "Genesis",
+        ex: "Exodus",
+        matt: "Matthew",
+        rom: "Romans",
+        jn: "John",
+        rev: "Revelation",
+        heb: "Hebrews",
+        cor: "Corinthians",
+      };
+      document
+        .getElementById("libSearchInput")
+        .addEventListener("keydown", (e) => {
+          if (e.key !== "Enter") return;
+          const q = e.target.value.trim();
+          const match = q.match(/^(\d?\s?[A-Za-z]+)\s+(\d+)(?::(\d+))?/);
+          if (!match) {
+            e.target.style.borderColor = "var(--live-red)";
+            return;
+          }
+          const key = match[1].trim().toLowerCase().replace(/\s+/g, "");
+          const book = bookAliases[key] || match[1].trim();
+          loadChapter(
+            book,
+            parseInt(match[2], 10),
+            match[3] ? parseInt(match[3], 10) : 1,
+          );
+          e.target.style.borderColor = "";
+        });
+
+      // ============ AI DETECTION ENGINE ============
+      // Explicit-reference detection over a live Deepgram transcript. This is the
+      // first slice — paraphrase/semantic detection (no stated reference) comes next.
+
+      // Must match the book names in the KJV corpus exactly (src/lib/bible/kjv.json).
+      const BOOK_NAMES = [
+        "Genesis",
+        "Exodus",
+        "Leviticus",
+        "Numbers",
+        "Deuteronomy",
+        "Joshua",
+        "Judges",
+        "Ruth",
+        "1 Samuel",
+        "2 Samuel",
+        "1 Kings",
+        "2 Kings",
+        "1 Chronicles",
+        "2 Chronicles",
+        "Ezra",
+        "Nehemiah",
+        "Esther",
+        "Job",
+        "Psalms",
+        "Proverbs",
+        "Ecclesiastes",
+        "Song of Solomon",
+        "Isaiah",
+        "Jeremiah",
+        "Lamentations",
+        "Ezekiel",
+        "Daniel",
+        "Hosea",
+        "Joel",
+        "Amos",
+        "Obadiah",
+        "Jonah",
+        "Micah",
+        "Nahum",
+        "Habakkuk",
+        "Zephaniah",
+        "Haggai",
+        "Zechariah",
+        "Malachi",
+        "Matthew",
+        "Mark",
+        "Luke",
+        "John",
+        "Acts",
+        "Romans",
+        "1 Corinthians",
+        "2 Corinthians",
+        "Galatians",
+        "Ephesians",
+        "Philippians",
+        "Colossians",
+        "1 Thessalonians",
+        "2 Thessalonians",
+        "1 Timothy",
+        "2 Timothy",
+        "Titus",
+        "Philemon",
+        "Hebrews",
+        "James",
+        "1 Peter",
+        "2 Peter",
+        "1 John",
+        "2 John",
+        "3 John",
+        "Jude",
+        "Revelation",
+      ];
+      // Common spoken/abbreviated forms -> canonical book name used in the corpus.
+      const DETECT_ALIASES = {
+        "1 samuel": "1 Samuel",
+        "1st samuel": "1 Samuel",
+        "first samuel": "1 Samuel",
+        "2 samuel": "2 Samuel",
+        "2nd samuel": "2 Samuel",
+        "second samuel": "2 Samuel",
+        "1 kings": "1 Kings",
+        "1st kings": "1 Kings",
+        "first kings": "1 Kings",
+        "2 kings": "2 Kings",
+        "2nd kings": "2 Kings",
+        "second kings": "2 Kings",
+        "1 chronicles": "1 Chronicles",
+        "1st chronicles": "1 Chronicles",
+        "first chronicles": "1 Chronicles",
+        "2 chronicles": "2 Chronicles",
+        "2nd chronicles": "2 Chronicles",
+        "second chronicles": "2 Chronicles",
+        "song of solomon": "Song of Solomon",
+        psalm: "Psalms",
+        psalms: "Psalms",
+        "1 corinthians": "1 Corinthians",
+        "1st corinthians": "1 Corinthians",
+        "first corinthians": "1 Corinthians",
+        "2 corinthians": "2 Corinthians",
+        "2nd corinthians": "2 Corinthians",
+        "second corinthians": "2 Corinthians",
+        "1 thessalonians": "1 Thessalonians",
+        "1st thessalonians": "1 Thessalonians",
+        "first thessalonians": "1 Thessalonians",
+        "2 thessalonians": "2 Thessalonians",
+        "2nd thessalonians": "2 Thessalonians",
+        "second thessalonians": "2 Thessalonians",
+        "1 timothy": "1 Timothy",
+        "1st timothy": "1 Timothy",
+        "first timothy": "1 Timothy",
+        "2 timothy": "2 Timothy",
+        "2nd timothy": "2 Timothy",
+        "second timothy": "2 Timothy",
+        "1 peter": "1 Peter",
+        "1st peter": "1 Peter",
+        "first peter": "1 Peter",
+        "2 peter": "2 Peter",
+        "2nd peter": "2 Peter",
+        "second peter": "2 Peter",
+        "1 john": "1 John",
+        "1st john": "1 John",
+        "first john": "1 John",
+        "2 john": "2 John",
+        "2nd john": "2 John",
+        "second john": "2 John",
+        "3 john": "3 John",
+        "3rd john": "3 John",
+        "third john": "3 John",
+        "i samuel": "1 Samuel",
+        "ii samuel": "2 Samuel",
+        "i kings": "1 Kings",
+        "ii kings": "2 Kings",
+        "i chronicles": "1 Chronicles",
+        "ii chronicles": "2 Chronicles",
+        "i corinthians": "1 Corinthians",
+        "ii corinthians": "2 Corinthians",
+        "i thessalonians": "1 Thessalonians",
+        "ii thessalonians": "2 Thessalonians",
+        "i timothy": "1 Timothy",
+        "ii timothy": "2 Timothy",
+        "i peter": "1 Peter",
+        "ii peter": "2 Peter",
+        "i john": "1 John",
+        "ii john": "2 John",
+        "iii john": "3 John",
+        philippians: "Philippians",
+        revelations: "Revelation",
+      };
+      const bookLookup = new Map();
+      BOOK_NAMES.forEach((b) => bookLookup.set(b.toLowerCase(), b));
+      Object.entries(DETECT_ALIASES).forEach(([k, v]) => bookLookup.set(k, v));
+
+      // Map spoken number words to digits so the regex only ever needs
+      // to match \d{1,3} for chapter and verse numbers.
+      const NUMBER_WORDS = {
+        one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+        eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
+        fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
+        nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
+        sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+      };
+
+      function normalizeNumbers(text) {
+        return text.replace(
+          /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\b/gi,
+          (m) => NUMBER_WORDS[m.toLowerCase()] ?? m,
+        );
+      }
+
+      // Matches both written and spoken reference patterns:
+      //   "John 3:16"        "John chapter 3 verse 16"
+      //   "John 3 16"        "John 3 verse 16"
+      //   "1 John 3:16"      "first John chapter 3 verse 16"
+      //   "Song of Solomon 2:1"
+      const BOOK_CAPTURE =
+        '((?:[123](?:st|nd|rd)?\\s+)?(?:first\\s+|second\\s+|third\\s+)?' +
+        '[a-z]+(?:\\s+of\\s+[a-z]+)?)';
+      const REF_PATTERN = new RegExp(
+        '\\b' +
+        BOOK_CAPTURE +
+        '(?:\\s+chapter)?' +
+        '\\s+(\\d{1,3})' +
+        '(?:\\s*:\\s*|\\s+verse\\s+|\\s+)' +
+        '(\\d{1,3})\\b',
+        'gi',
+      );
+
+      function detectReferences(text) {
+        // Normalize all number words to digits first ("two" → "2", "three" → "3").
+        // This catches whatever forms smart_format didn't convert, and makes the
+        // regex trivial — it only ever needs to match digits for chapter/verse.
+        const normalized = normalizeNumbers(text);
+        const found = [];
+        let m;
+        REF_PATTERN.lastIndex = 0;
+        while ((m = REF_PATTERN.exec(normalized)) !== null) {
+          const rawBook = m[1].trim().toLowerCase();
+          const canonical = bookLookup.get(rawBook);
+          if (!canonical) continue;
+          found.push({
+            book: canonical,
+            chapter: parseInt(m[2], 10),
+            verse: parseInt(m[3], 10),
+            matchedText: m[0],
+          });
+        }
+        return found;
+      }
+
+      const asstFeed = document.querySelector(".asst-feed");
+      async function addDetectionCard(book, chapter, verse, snippet, isTop) {
+        const verseObj = await window.scriptureCaster
+          .getChapter(book, chapter)
+          .then((vs) => vs.find((v) => v.verse === verse));
+        if (!verseObj) return;
+        const timeEl = document.createElement("div");
+        timeEl.className = "feed-time";
+        timeEl.textContent = "JUST NOW";
+        const card = document.createElement("div");
+        card.className = "card" + (isTop ? " top" : "");
+        card.innerHTML =
+          '<div class="card-row"><span class="card-ref">' +
+          book +
+          " " +
+          chapter +
+          ":" +
+          verse +
+          '</span><span class="tag explicit">Reference</span></div>' +
+          '<div class="card-snip">' +
+          verseObj.text +
+          '</div>' +
+          '<div class="card-actions"><div class="mini-btn">Preview</div><div class="mini-btn primary">Push live</div></div>';
+        const [previewBtn, pushBtn] = card.querySelectorAll(".mini-btn");
+        previewBtn.addEventListener("click", async () => {
+          await loadChapter(book, chapter, verse);
+          setStageState(false);
+        });
+        pushBtn.addEventListener("click", async () => {
+          await loadChapter(book, chapter, verse);
+          document.getElementById("pushLiveBtn").click();
+        });
+        asstFeed.insertBefore(timeEl, asstFeed.firstChild);
+        asstFeed.insertBefore(card, timeEl);
+      }
+
+      // ---- Deepgram streaming (needs your own API key — see README) ----
+      let dgSocket = null;
+      let mediaRecorder = null;
+      let audioStream = null;
+      let listening = false;
+
+      function getDeepgramKey() {
+        return new Promise((resolve) => {
+          const stored = sessionStorage.getItem("dgKey");
+          if (stored) {
+            resolve(stored);
+            return;
+          }
+          const overlay = document.getElementById("dgKeyOverlay");
+          const input = document.getElementById("dgKeyInput");
+          overlay.classList.add("show");
+          input.focus();
+          function cleanup() {
+            overlay.classList.remove("show");
+          }
+          document.getElementById("dgKeySave").onclick = () => {
+            const key = input.value.trim();
+            if (!key) return;
+            sessionStorage.setItem("dgKey", key);
+            cleanup();
+            resolve(key);
+          };
+          document.getElementById("dgKeyCancel").onclick = () => {
+            cleanup();
+            resolve(null);
+          };
+        });
+      }
+
+      function getBestMimeType() {
+        const types = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/ogg;codecs=opus',
+        ];
+        for (const t of types) {
+          if (MediaRecorder.isTypeSupported(t)) return t;
+        }
+        return '';
+      }
+
+      // Browser mic defaults (48kHz stereo Opus) work best for WebM containers
+      // — let Deepgram auto-detect the format rather than forcing a resample.
+      const AUDIO_CONSTRAINTS = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
+
+      async function startListening() {
+        const key = await getDeepgramKey();
+        if (!key) return;
+
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+        if (!audioStream) return;
+
+        // Nova-2 is Deepgram's most accurate model. The website defaults to it;
+        // the API defaults to a much weaker base model unless you opt in.
+        const mimeType = getBestMimeType();
+        const url =
+          "wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&sample_rate=48000";
+        dgSocket = new WebSocket(url, ["token", key]);
+
+        dgSocket.onopen = () => {
+          const recorderOpts = {
+            audioBitsPerSecond: 64000,
+            ...(mimeType ? { mimeType } : {}),
+          };
+          try {
+            mediaRecorder = new MediaRecorder(audioStream, recorderOpts);
+          } catch (e) {
+            console.error('MediaRecorder init failed, trying without mimeType', e);
+            mediaRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 64000 });
+          }
+          mediaRecorder.addEventListener("dataavailable", (e) => {
+            if (e.data.size > 0 && dgSocket.readyState === WebSocket.OPEN)
+              dgSocket.send(e.data);
+          });
+          mediaRecorder.addEventListener("error", (e) => {
+            console.error('MediaRecorder error', e);
+            stopListening();
+          });
+          mediaRecorder.start(250);
+        };
+
+        dgSocket.onmessage = (message) => {
+          const data = JSON.parse(message.data);
+          const transcript =
+            data.channel &&
+            data.channel.alternatives &&
+            data.channel.alternatives[0] &&
+            data.channel.alternatives[0].transcript;
+          if (!transcript) return;
+          const textEl = document.getElementById("transcriptText");
+          textEl.innerHTML =
+            transcript + '<span class="transcript-caret"></span>';
+
+          if (data.is_final) {
+            const refs = detectReferences(transcript);
+            refs.forEach((r, i) =>
+              addDetectionCard(
+                r.book,
+                r.chapter,
+                r.verse,
+                transcript.trim(),
+                i === 0,
+              ),
+            );
+          }
+        };
+
+        dgSocket.onerror = (err) => {
+          console.error("Deepgram error", err);
+        };
+        dgSocket.onclose = () => {
+          console.log("Deepgram connection closed");
+        };
+
+        listening = true;
+        document.getElementById("listenLabel").textContent = "Listening";
+        document.getElementById("listenDot").style.animation = "";
+        document.getElementById("listenDot").style.background = "";
+      }
+
+      function stopListening() {
+        if (mediaRecorder) mediaRecorder.stop();
+        if (dgSocket) dgSocket.close();
+        if (audioStream) {
+          audioStream.getTracks().forEach(t => t.stop());
+          audioStream = null;
+        }
+        listening = false;
+        document.getElementById("listenLabel").textContent = "Start listening";
+        document.getElementById("listenDot").style.animation = "none";
+        document.getElementById("listenDot").style.background =
+          "var(--text-lo)";
+      }
+
+      document.getElementById("listenToggle").addEventListener("click", () => {
+        if (listening) stopListening();
+        else
+          startListening().catch((err) => {
+            alert("Could not start listening: " + err.message);
+          });
+      });
+      const searchInput = document.getElementById("searchInput");
+      const searchResultsEl = document.getElementById("searchResults");
+      let searchTimer = null;
+      searchInput.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        const q = searchInput.value.trim();
+        if (q.length < 3) {
+          searchResultsEl.innerHTML = "";
+          return;
+        }
+        searchTimer = setTimeout(async () => {
+          const results = await window.scriptureCaster.searchVerses(q);
+          searchResultsEl.innerHTML = "";
+          results.slice(0, 8).forEach((r) => {
+            const row = document.createElement("div");
+            row.className = "card";
+            row.style.marginBottom = "8px";
+            row.style.cursor = "pointer";
+            row.innerHTML =
+              '<div class="card-row"><span class="card-ref">' +
+              r.book +
+              " " +
+              r.chapter +
+              ":" +
+              r.verse +
+              '</span></div><div class="card-snip">' +
+              r.text +
+              "</div>";
+            row.addEventListener("click", () =>
+              loadChapter(r.book, r.chapter, r.verse),
+            );
+            searchResultsEl.appendChild(row);
+          });
+        }, 250);
+      });
+
+      // Push live promotes whatever is currently staged to actually live, and
+      // calls the real Electron IPC bridge so the second (output) window updates.
+      document.getElementById("pushLiveBtn").addEventListener("click", () => {
+        document
+          .querySelectorAll(".vcard")
+          .forEach((c) => c.classList.remove("is-live", "is-staged"));
+        if (stagedVerse) {
+          const card = Array.from(document.querySelectorAll(".vcard")).find(
+            (c) =>
+              parseInt(c.querySelector(".vnum").textContent) === stagedVerse.n,
+          );
+          if (card) card.classList.add("is-live");
+        }
+        setStageState(true);
+        document.getElementById("splitLiveVerse").innerHTML =
+          document.getElementById("stageVerse").innerHTML;
+        applyBlankMode("none"); // pushing live should un-blank the output, not push behind a black/logo screen
+
+        if (window.scriptureCaster && stagedVerse) {
+          window.scriptureCaster.pushLive({
+            id: stagedVerse.ref,
+            book: stagedVerse.book,
+            chapter: stagedVerse.chapter,
+            verse: stagedVerse.n,
+            text: stagedVerse.text,
+            translation: "KJV",
+            method: "explicit",
+            confidence: 1,
+            transcriptSnippet: "",
+            detectedAt: Date.now(),
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
