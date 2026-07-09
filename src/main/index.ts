@@ -6,7 +6,7 @@ import {
   type OutputState,
   type BlankMode,
 } from "../shared/types";
-import { getChapter, smartSearch } from "../lib/bible";
+import { getChapter, smartSearch, paraphraseSearch } from "../lib/bible";
 
 let operatorWindow: BrowserWindow | null = null;
 let outputWindow: BrowserWindow | null = null;
@@ -105,6 +105,13 @@ app.whenReady().then(() => {
   ipcMain.handle(IPC.BIBLE_SEARCH, (_event, query: string) => {
     return smartSearch(query, 20);
   });
+
+  ipcMain.handle(
+    IPC.BIBLE_PARAPHRASE_SEARCH,
+    (_event, query: string) => {
+      return paraphraseSearch(query);
+    },
+  );
 
   ipcMain.handle(IPC.GET_DESKTOP_AUDIO_SOURCE, async () => {
     const sources = await desktopCapturer.getSources({

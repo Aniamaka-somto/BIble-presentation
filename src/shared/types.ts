@@ -37,6 +37,7 @@ export const IPC = {
   OUTPUT_STATE_CHANGED: 'output:state-changed',
   BIBLE_GET_CHAPTER: 'bible:get-chapter',
   BIBLE_SEARCH: 'bible:search',
-  GET_DESKTOP_AUDIO_SOURCE: 'desktop:get-audio-source'
+  GET_DESKTOP_AUDIO_SOURCE: 'desktop:get-audio-source',
+  BIBLE_PARAPHRASE_SEARCH: 'bible:paraphrase-search'
 } as const
 

@@ -7,6 +7,10 @@ export interface BibleVerse {
   text: string;
 }
 
+export interface ParaphraseMatch extends BibleVerse {
+  score: number;
+}
+
 const ALL_VERSES = kjv as BibleVerse[];
 
 // Index by "Book Chapter" for fast chapter lookups (what the filmstrip needs)
@@ -40,6 +44,58 @@ export function lookupReference(ref: string): BibleVerse[] {
   return getChapter(book.trim(), chapter).filter(
     (v) => v.verse >= start && v.verse <= end,
   );
+}
+
+const STOP_WORDS = new Set([
+  'the','a','an','and','or','but','in','on','at','to','for','of','with',
+  'by','from','up','down','out','off','over','under','again','further',
+  'then','once','here','there','when','where','why','how','all','each',
+  'every','both','few','more','most','other','some','such','no','nor',
+  'not','only','own','same','so','than','too','very','because',
+  'as','until','while','about','against','between','into','through',
+  'during','before','after','above','below','is','was','were','be',
+  'been','being','have','has','had','do','does','did','will','would',
+  'can','could','should','may','might','must','i','you','he',
+  'she','it','we','they','me','him','her','us','them','my','your',
+  'his','its','our','their','mine','yours','hers','ours','theirs',
+  'this','that','these','those','am','art','dost','doth','didst','hath',
+  'thou','thee','thy','thine','ye','unto','upon','hast','hadst','shalt',
+  'wilt','canst','couldst','wouldst','shouldst','mightst','mayest',
+]);
+
+function tokenize(text: string): string[] {
+  return text.toLowerCase()
+    .replace(/[^a-z\s]/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+}
+
+// Word-overlap scoring for paraphrase detection.
+// Returns verses where a significant fraction of the query's content words appear.
+export function paraphraseSearch(
+  query: string,
+  limit = 5,
+  threshold = 0.35,
+): ParaphraseMatch[] {
+  const queryWords = tokenize(query);
+  if (queryWords.length < 3) return [];
+
+  const results: ParaphraseMatch[] = [];
+  for (const v of ALL_VERSES) {
+    const verseWords = new Set(tokenize(v.text));
+    let matches = 0;
+    for (const w of queryWords) {
+      if (verseWords.has(w)) matches++;
+    }
+    const rawScore = matches / queryWords.length;
+    // Boost: require at least 2 matching words for scores near threshold
+    const adjusted = rawScore * Math.min(1, matches / 2);
+    if (adjusted >= threshold) {
+      results.push({ ...v, score: Math.round(adjusted * 100) / 100 });
+    }
+  }
+
+  return results.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 // Naive full-text search across the corpus — good enough for the manual

@@ -2124,7 +2124,43 @@
       }
 
       const asstFeed = document.querySelector(".asst-feed");
-      async function addDetectionCard(book, chapter, verse, snippet, isTop) {
+
+      // Dedupe: avoid showing the same candidate set via paraphrase within 30s
+      let recentParaphraseKey = null;
+      let recentParaphraseTime = 0;
+      const PARAPHRASE_COOLDOWN_MS = 30000;
+      const MAX_PARAPHRASE_MATCHES = 4;
+
+      async function paraphraseScout(text) {
+        if (recentParaphraseKey && Date.now() - recentParaphraseTime < PARAPHRASE_COOLDOWN_MS) {
+          return [];
+        }
+
+        // Step 1: try substring search first — catches verbatim quotes like "Jesus wept"
+        const direct = await window.scriptureCaster.searchVerses(text.trim());
+        let candidates = direct.length > 0
+          ? direct.map((v) => ({ ...v, score: 1 }))
+          : await window.scriptureCaster.paraphraseSearch(text);
+
+        if (candidates.length === 0) return [];
+
+        candidates = candidates
+          .sort((a, b) => b.score - a.score)
+          .slice(0, MAX_PARAPHRASE_MATCHES);
+
+        // Dedupe on the whole set so adding/removing a candidate re-fires
+        const key = candidates
+          .map((c) => `${c.book} ${c.chapter}:${c.verse}`)
+          .sort()
+          .join("|");
+        if (key === recentParaphraseKey) return [];
+
+        recentParaphraseKey = key;
+        recentParaphraseTime = Date.now();
+        return candidates;
+      }
+
+      async function addDetectionCard(book, chapter, verse, snippet, isTop, isParaphrase, score) {
         const verseObj = await window.scriptureCaster
           .getChapter(book, chapter)
           .then((vs) => vs.find((v) => v.verse === verse));
@@ -2136,12 +2172,12 @@
         card.className = "card" + (isTop ? " top" : "");
         card.innerHTML =
           '<div class="card-row"><span class="card-ref">' +
-          book +
+           book +
           " " +
           chapter +
           ":" +
           verse +
-          '</span><span class="tag explicit">Reference</span></div>' +
+          '</span><span class="tag ' + (isParaphrase ? 'paraphrase' : 'explicit') + '">' + (isParaphrase ? 'Paraphrase' + (score != null ? ' \u00B7 ' + Math.round(score * 100) + '%' : '') : 'Reference') + '</span></div>' +
           '<div class="card-snip">' +
           verseObj.text +
           '</div>' +
@@ -2250,11 +2286,11 @@
 
         dgSocket.onmessage = (message) => {
           const data = JSON.parse(message.data);
-          const transcript =
+          const alt =
             data.channel &&
             data.channel.alternatives &&
-            data.channel.alternatives[0] &&
-            data.channel.alternatives[0].transcript;
+            data.channel.alternatives[0];
+          const transcript = alt && alt.transcript;
           if (!transcript) return;
           const textEl = document.getElementById("transcriptText");
           textEl.innerHTML =
@@ -2269,8 +2305,25 @@
                 r.verse,
                 transcript.trim(),
                 i === 0,
+                false,
               ),
             );
+            if (refs.length === 0 && alt && alt.confidence >= 0.7) {
+              paraphraseScout(transcript).then((matches) => {
+                if (!matches || matches.length === 0) return;
+                matches.forEach((m, i) =>
+                  addDetectionCard(
+                    m.book,
+                    m.chapter,
+                    m.verse,
+                    transcript.trim(),
+                    i === 0,
+                    true,
+                    m.score,
+                  ),
+                );
+              });
+            }
           }
         };
 

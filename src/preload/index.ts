@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('scriptureCaster', {
   setBlankMode: (mode: BlankMode) => ipcRenderer.send(IPC.SET_BLANK_MODE, mode),
   getChapter: (book: string, chapter: number) => ipcRenderer.invoke(IPC.BIBLE_GET_CHAPTER, book, chapter),
   searchVerses: (query: string) => ipcRenderer.invoke(IPC.BIBLE_SEARCH, query),
+  paraphraseSearch: (query: string) => ipcRenderer.invoke(IPC.BIBLE_PARAPHRASE_SEARCH, query),
   getDesktopAudioSource: () => ipcRenderer.invoke(IPC.GET_DESKTOP_AUDIO_SOURCE) as Promise<DesktopSource | null>,
   onOutputStateChanged: (callback: (state: OutputState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: OutputState) => callback(state)
