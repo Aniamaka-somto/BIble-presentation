@@ -746,6 +746,23 @@
         justify-content: space-between;
         flex-shrink: 0;
       }
+      .stage-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background-size: cover;
+        background-position: center;
+        pointer-events: none;
+      }
+      .stage-bg video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .stage > *:not(.stage-bg) {
+        position: relative;
+        z-index: 1;
+      }
       .navctl {
         display: flex;
         align-items: center;
@@ -795,6 +812,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        position: relative;
       }
       .split-pane.live-pane {
         border-color: rgba(255, 84, 112, 0.4);
@@ -825,6 +843,23 @@
         text-align: center;
         padding: 16px;
         overflow: hidden;
+      }
+      .split-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background-size: cover;
+        background-position: center;
+        pointer-events: none;
+      }
+      .split-bg video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .split-pane > *:not(.split-bg) {
+        position: relative;
+        z-index: 1;
       }
       .split-verse {
         font-family: "Fraunces", serif;
@@ -1483,6 +1518,7 @@
       <div class="center-col">
         <div class="stage-wrap" id="stageWrap">
           <div class="stage" id="stage">
+            <div class="stage-bg" id="stageBg"></div>
             <div class="stage-head">
               <div class="state-tag is-live" id="stateTag">
                 <span class="state-dot"></span>LIVE — on screen now
@@ -1551,6 +1587,7 @@
 
           <div class="split-stage">
             <div class="split-pane">
+              <div class="split-bg" id="previewBg"></div>
               <div class="split-pane-head">
                 <span class="split-pane-label">Preview — next up</span>
               </div>
@@ -1562,6 +1599,7 @@
               </div>
             </div>
             <div class="split-pane live-pane">
+              <div class="split-bg" id="liveBg"></div>
               <div class="split-pane-head">
                 <span class="split-pane-label">Live — on screen now</span>
               </div>
@@ -2730,6 +2768,33 @@
         return "bg://" + fileName;
       }
 
+      function applyBackgroundToPreview(src) {
+        const containers = [
+          document.getElementById("stageBg"),
+          document.getElementById("previewBg"),
+          document.getElementById("liveBg"),
+        ];
+        containers.forEach((el) => {
+          if (!el) return;
+          // Remove old video children
+          el.querySelectorAll("video").forEach((v) => v.remove());
+          el.style.backgroundImage = "";
+          if (!src) return;
+          if (src.type === "image") {
+            el.style.backgroundImage = "url(" + bgUrl(src.fileName) + ")";
+          } else {
+            const vid = document.createElement("video");
+            vid.src = bgUrl(src.fileName);
+            vid.muted = true;
+            vid.loop = true;
+            vid.playsInline = true;
+            vid.autoplay = true;
+            vid.addEventListener("canplay", () => vid.play().catch(() => {}), { once: true });
+            el.appendChild(vid);
+          }
+        });
+      }
+
       async function renderBackgrounds() {
         const grid = document.getElementById("bgGrid");
         const items = await window.scriptureCaster.getBackgrounds();
@@ -2759,8 +2824,10 @@
             '<button class="bg-card-del" data-id="' + b.id + '">\u00d7</button>';
           card.addEventListener("click", (e) => {
             if (e.target.closest(".bg-card-del")) return;
-            activeBackground = { type: b.type, fileName: b.fileName };
-            window.scriptureCaster.setBackground({ type: b.type, fileName: b.fileName });
+            const src = { type: b.type, fileName: b.fileName };
+            activeBackground = src;
+            window.scriptureCaster.setBackground(src);
+            applyBackgroundToPreview(src);
             card.closest(".bg-grid").querySelectorAll(".bg-card").forEach((c) => c.classList.remove("active"));
             card.classList.add("active");
           });
@@ -2770,6 +2837,7 @@
             if (activeBackground?.fileName === b.fileName) {
               activeBackground = null;
               window.scriptureCaster.clearBackground();
+              applyBackgroundToPreview(null);
             }
             renderBackgrounds();
           });
