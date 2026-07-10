@@ -406,6 +406,10 @@
         border-bottom-color: var(--blue);
         background: var(--bg-1);
       }
+      .lib-tab.on.alt-on {
+        color: var(--gold);
+        border-bottom-color: var(--gold);
+      }
       .lib-more {
         margin-left: auto;
         font-size: 11px;
@@ -495,6 +499,115 @@
         font-size: 11px;
         color: var(--text-lo);
       }
+
+      /* ============ BACKGROUND MANAGER ============ */
+      .bg-manager {
+        display: none;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        padding: 9px 10px;
+        gap: 10px;
+      }
+      .bg-manager.show { display: flex; }
+      .bg-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+      .bg-header h3 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-hi);
+        margin: 0;
+      }
+      .bg-add-btn {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 7px;
+        border: none;
+        background: var(--blue);
+        color: #fff;
+        cursor: pointer;
+      }
+      .bg-add-btn:hover { opacity: 0.85; }
+      .bg-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+        align-content: start;
+      }
+      .bg-card {
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--bg-2);
+        border: 2px solid transparent;
+        cursor: pointer;
+        position: relative;
+        aspect-ratio: 16 / 9;
+      }
+      .bg-card:hover { border-color: var(--blue-2); }
+      .bg-card.active { border-color: var(--gold); }
+      .bg-card img, .bg-card video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        pointer-events: none;
+      }
+      .bg-card-name {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        font-size: 10px;
+        padding: 4px 6px;
+        background: rgba(0,0,0,0.6);
+        color: #ddd;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .bg-card-del {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(0,0,0,0.55);
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+      .bg-card:hover .bg-card-del { display: flex; }
+      .bg-card-del:hover { background: rgba(200,50,50,0.85); }
+      .bg-empty {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 20px;
+        color: var(--text-lo);
+        font-size: 13px;
+        text-align: center;
+        gap: 8px;
+      }
+      .bg-empty svg { width: 40px; height: 40px; opacity: 0.3; }
+
+      /* Hide scripture panels when background tab is active */
+      .lib-search.hide, .lib-list.hide { display: none; }
 
       /* ============ CENTER: STAGE ============ */
       .center-col {
@@ -1346,6 +1459,23 @@
               </div>
             </div>
           </div>
+          <!-- Background Manager panel -->
+          <div class="bg-manager" id="bgManager">
+            <div class="bg-header">
+              <h3>Backgrounds</h3>
+              <button class="bg-add-btn" id="bgAddBtn">+ Add Background</button>
+            </div>
+            <div class="bg-grid" id="bgGrid">
+              <div class="bg-empty" id="bgEmpty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2" y="4" width="20" height="16" rx="2"/>
+                  <circle cx="9" cy="10" r="2"/>
+                  <path d="M22 14l-5-5L3 19"/>
+                </svg>
+                No backgrounds yet.<br/>Click "+ Add Background" to import images or videos.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1731,8 +1861,15 @@
         tab.addEventListener("click", () => {
           document
             .querySelectorAll(".lib-tab")
-            .forEach((t) => t.classList.remove("on"));
+            .forEach((t) => t.classList.remove("on", "alt-on"));
           tab.classList.add("on");
+          if (tab.dataset.tab === "themes") tab.classList.add("alt-on");
+
+          const isBg = tab.dataset.tab === "themes";
+          document.querySelector(".lib-search")?.classList.toggle("hide", isBg);
+          document.querySelector(".lib-list")?.classList.toggle("hide", isBg);
+          document.getElementById("bgManager")?.classList.toggle("show", isBg);
+          if (isBg) renderBackgrounds();
         });
       });
       document.querySelectorAll(".sched-item").forEach((item) => {
@@ -1895,23 +2032,158 @@
         heb: "Hebrews",
         cor: "Corinthians",
       };
-      document
-        .getElementById("libSearchInput")
-        .addEventListener("keydown", (e) => {
-          if (e.key !== "Enter") return;
-          const q = e.target.value.trim();
-          const match = q.match(/^(\d?\s?[A-Za-z]+)\s+(\d+)(?::(\d+))?/);
+
+      // ---- Search autocomplete (EasyWorship-style) ----
+      let searchBooks = [];
+      let searchField = "book"; // "book" | "chapter" | "verse"
+      let searchBookName = "";
+
+      function findBook(prefix) {
+        const lower = prefix.toLowerCase().replace(/\s+/g, "");
+        // Direct prefix match on full book name
+        for (const b of searchBooks) {
+          const key = b.name.toLowerCase().replace(/\s+/g, "");
+          if (key.startsWith(lower)) return b;
+        }
+        // Try alias
+        const alias = bookAliases[lower];
+        if (alias) return searchBooks.find((b) => b.name === alias);
+        // Strip number prefix ("1cor" → "cor")
+        const noNum = lower.replace(/^\d/, "");
+        if (noNum !== lower) {
+          for (const b of searchBooks) {
+            const key = b.name.toLowerCase().replace(/^\d+\s+/, "").replace(/\s+/g, "");
+            if (key.startsWith(noNum)) return b;
+          }
+        }
+        return null;
+      }
+
+      function canExtendChapter(book, digits) {
+        if (digits.length === 0) return true;
+        return parseInt(digits + "0", 10) <= book.chapters;
+      }
+
+      document.getElementById("libSearchInput").addEventListener("focus", async function () {
+        if (searchBooks.length === 0) {
+          searchBooks = await window.scriptureCaster.getBookList();
+        }
+      });
+
+      document.getElementById("libSearchInput").addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight" && this.selectionStart < this.value.length) {
+          // Commit highlighted field
+          const val = this.value;
+          const cursor = this.selectionStart;
+          const textEnd = val.search(/\d/);
+          const textPart = textEnd === -1 ? val : val.slice(0, textEnd).trim();
+          const numPart = textEnd === -1 ? "" : val.slice(textEnd);
+
+          if (searchField === "book" && searchBookName) {
+            // Commit book, start chapter
+            const rest = val.slice(textPart.length);
+            this.value = searchBookName + (numPart || ":1");
+            searchField = "chapter";
+            const start = searchBookName.length + 1;
+            this.setSelectionRange(start, this.value.length);
+          } else if (searchField === "chapter" && numPart) {
+            // Commit chapter, start verse
+            searchField = "verse";
+            const start = val.length;
+            this.setSelectionRange(start, start);
+          }
+          e.preventDefault();
+          return;
+        }
+
+        if (e.key === "Enter") {
+          const q = this.value.trim();
+          const match = q.match(/^(\d?\s?[A-Za-z\s]+?)\s*(\d+)?(?::(\d+))?$/);
           if (!match) {
-            e.target.style.borderColor = "var(--live-red)";
+            this.style.borderColor = "var(--live-red)";
             return;
           }
-          const key = match[1].trim().toLowerCase().replace(/\s+/g, "");
-          const book = bookAliases[key] || match[1].trim();
-          const chapter = parseInt(match[2], 10);
+          let bookName = match[1].trim();
+          const lower = bookName.toLowerCase().replace(/\s+/g, "");
+          const found = findBook(lower);
+          if (found) bookName = found.name;
+          else {
+            const alias = bookAliases[lower];
+            if (alias) bookName = alias;
+          }
+          const chapter = match[2] ? parseInt(match[2], 10) : 1;
           const verse = match[3] ? parseInt(match[3], 10) : 1;
-          loadAndStage(book, chapter, verse);
-          e.target.style.borderColor = "";
-        });
+          loadAndStage(bookName, chapter, verse);
+          this.style.borderColor = "";
+          searchField = "book";
+          searchBookName = "";
+          return;
+        }
+      });
+
+      document.getElementById("libSearchInput").addEventListener("input", function () {
+        const val = this.value;
+        const cursor = this.selectionStart;
+
+        const textEnd = val.search(/\d/);
+        const textPart = textEnd === -1 ? val : val.slice(0, textEnd).trim();
+        const numPart = textEnd === -1 ? "" : val.slice(textEnd);
+
+        if (textPart.length === 0) {
+          searchField = "book";
+          searchBookName = "";
+          return;
+        }
+
+        const book = findBook(textPart);
+        if (!book || !book.name.toLowerCase().startsWith(textPart.toLowerCase())) {
+          searchBookName = book ? book.name : "";
+          return;
+        }
+
+        searchBookName = book.name;
+
+        // Build the completion: book name + default chapter:verse or user's numbers
+        const restOfBook = book.name.slice(textPart.length);
+        let suffix = numPart ? "" : " 1:1";
+        let chapterStr = "";
+        let verseStr = "";
+
+        if (numPart) {
+          // Parse digits — first is chapter, after colon or space is verse
+          const colonIdx = numPart.indexOf(":");
+          if (colonIdx !== -1) {
+            chapterStr = numPart.slice(0, colonIdx);
+            verseStr = numPart.slice(colonIdx + 1);
+          } else {
+            // Could be chapter only, or chapter+verse without separator
+            // If the digits can't extend to a valid chapter, treat as verse
+            const digits = numPart;
+            if (canExtendChapter(book, digits)) {
+              chapterStr = digits;
+            } else {
+              chapterStr = digits;
+            }
+          }
+          suffix = ":" + (verseStr || "1");
+        }
+
+        const newValue = book.name + (chapterStr ? " " + chapterStr : "") + suffix;
+        if (newValue === this.value && this.selectionStart === this.value.length) return;
+
+        this.value = newValue;
+
+        // Select the auto-completed portion (everything after what user typed past the book)
+        if (!numPart) {
+          // Select from end of user's typed book prefix to end
+          const lastSpace = this.value.indexOf(" ", textPart.length - 1);
+          const start = lastSpace !== -1 ? lastSpace + 1 : textPart.length + restOfBook.length + 1;
+          this.setSelectionRange(start, this.value.length);
+        } else {
+          const start = this.value.length;
+          this.setSelectionRange(start, start);
+        }
+      });
 
       // ============ AI DETECTION ENGINE ============
       // Explicit-reference detection over a live Deepgram transcript. This is the
@@ -2136,11 +2408,9 @@
           return [];
         }
 
-        // Step 1: try substring search first — catches verbatim quotes like "Jesus wept"
-        const direct = await window.scriptureCaster.searchVerses(text.trim());
-        let candidates = direct.length > 0
-          ? direct.map((v) => ({ ...v, score: 1 }))
-          : await window.scriptureCaster.paraphraseSearch(text);
+        // paraphraseSearch now handles both exact phrase matching (punctuation-agnostic)
+        // and loose word-overlap with order/proximity scoring — one call covers both.
+        let candidates = await window.scriptureCaster.paraphraseSearch(text);
 
         if (candidates.length === 0) return [];
 
@@ -2432,6 +2702,71 @@
             detectedAt: Date.now(),
           });
         }
+      });
+
+      // ---- Background Manager ----
+      let activeBackground = null;
+
+      function bgUrl(fileName) {
+        return "bg://" + fileName;
+      }
+
+      async function renderBackgrounds() {
+        const grid = document.getElementById("bgGrid");
+        const items = await window.scriptureCaster.getBackgrounds();
+        grid.innerHTML = "";
+
+        if (items.length === 0) {
+          grid.innerHTML =
+            '<div class="bg-empty" id="bgEmpty">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
+            '<rect x="2" y="4" width="20" height="16" rx="2"/>' +
+            '<circle cx="9" cy="10" r="2"/>' +
+            '<path d="M22 14l-5-5L3 19"/>' +
+            "</svg>No backgrounds yet.<br/>Click '+ Add Background' to import images or videos.</div>";
+          return;
+        }
+
+        items.forEach((b) => {
+          const card = document.createElement("div");
+          card.className = "bg-card" + (activeBackground?.fileName === b.fileName ? " active" : "");
+          const media =
+            b.type === "video"
+              ? '<video src="' + bgUrl(b.fileName) + '" muted loop playsinline preload="metadata"></video>'
+              : '<img src="' + bgUrl(b.fileName) + '" loading="lazy" />';
+          card.innerHTML =
+            media +
+            '<span class="bg-card-name">' + b.name + '</span>' +
+            '<button class="bg-card-del" data-id="' + b.id + '">\u00d7</button>';
+          card.addEventListener("click", (e) => {
+            if (e.target.closest(".bg-card-del")) return;
+            activeBackground = { type: b.type, fileName: b.fileName };
+            window.scriptureCaster.setBackground({ type: b.type, fileName: b.fileName });
+            card.closest(".bg-grid").querySelectorAll(".bg-card").forEach((c) => c.classList.remove("active"));
+            card.classList.add("active");
+          });
+          card.querySelector(".bg-card-del").addEventListener("click", async (e) => {
+            e.stopPropagation();
+            await window.scriptureCaster.deleteBackground(b.id);
+            if (activeBackground?.fileName === b.fileName) {
+              activeBackground = null;
+              window.scriptureCaster.clearBackground();
+            }
+            renderBackgrounds();
+          });
+          // play video on hover
+          const vid = card.querySelector("video");
+          if (vid) {
+            card.addEventListener("mouseenter", () => vid.play().catch(() => {}));
+            card.addEventListener("mouseleave", () => { vid.pause(); vid.currentTime = 0; });
+          }
+          grid.appendChild(card);
+        });
+      }
+
+      document.getElementById("bgAddBtn").addEventListener("click", async () => {
+        const added = await window.scriptureCaster.importBackgrounds();
+        if (added.length > 0) renderBackgrounds();
       });
     </script>
   </body>

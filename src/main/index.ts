@@ -1,20 +1,29 @@
-import { app, BrowserWindow, ipcMain, screen, desktopCapturer } from "electron";
-import { join } from "path";
+import {
+  app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog, protocol, net,
+} from "electron";
+import { join, extname, basename } from "path";
+import { pathToFileURL } from "url";
+import * as fs from "fs/promises";
 import {
   IPC,
   type VerseMatch,
   type OutputState,
   type BlankMode,
+  type BackgroundItem,
+  type BackgroundSource,
 } from "../shared/types";
-import { getChapter, smartSearch, paraphraseSearch } from "../lib/bible";
+import { getChapter, smartSearch, phraseSearch, paraphraseSearch, getBookList } from "../lib/bible";
 
 let operatorWindow: BrowserWindow | null = null;
 let outputWindow: BrowserWindow | null = null;
+const backgroundsDir = join(app.getPath("userData"), "backgrounds");
+const metaPath = join(backgroundsDir, "meta.json");
 
 const outputState: OutputState = {
   live: false,
   verse: null,
   blankMode: "none",
+  background: null,
 };
 
 function createOperatorWindow() {
@@ -39,8 +48,6 @@ function createOperatorWindow() {
 }
 
 function createOutputWindow() {
-  // Put it on a second display if one is available, otherwise open windowed
-  // so it can still be captured as an OBS Window Source.
   const displays = screen.getAllDisplays();
   const target =
     displays.find((d) => d.id !== screen.getPrimaryDisplay().id) ?? displays[0];
@@ -70,11 +77,59 @@ function createOutputWindow() {
   }
 }
 
-app.whenReady().then(() => {
+// ---- Background helpers ----
+async function ensureBackgroundsDir() {
+  try { await fs.mkdir(backgroundsDir, { recursive: true }); } catch { /* ok */ }
+}
+
+async function readMeta(): Promise<BackgroundItem[]> {
+  try {
+    const raw = await fs.readFile(metaPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function writeMeta(items: BackgroundItem[]) {
+  await fs.writeFile(metaPath, JSON.stringify(items, null, 2), "utf-8");
+}
+
+async function importFiles(srcPaths: string[]): Promise<BackgroundItem[]> {
+  await ensureBackgroundsDir();
+  const meta = await readMeta();
+  const added: BackgroundItem[] = [];
+
+  for (const src of srcPaths) {
+    const ext = extname(src).toLowerCase();
+    const type = [".mp4", ".mov", ".webm"].includes(ext) ? "video" : "image";
+    if (type === "image" && ![".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(ext)) continue;
+
+    const id = `bg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const destName = `${id}${ext}`;
+    await fs.copyFile(src, join(backgroundsDir, destName));
+
+    added.push({ id, name: basename(src), type, fileName: destName, addedAt: Date.now() });
+  }
+
+  const updated = [...meta, ...added];
+  await writeMeta(updated);
+  return added;
+}
+
+app.whenReady().then(async () => {
+  await ensureBackgroundsDir();
+
+  // bg:// protocol serves background media files
+  protocol.handle("bg", (request) => {
+    const fileName = decodeURIComponent(request.url.slice("bg://".length));
+    return net.fetch(pathToFileURL(join(backgroundsDir, fileName)).href);
+  });
+
   createOperatorWindow();
   createOutputWindow();
 
-  // Operator pushes a detected verse live -> broadcast new state to the output window.
+  // ---- Verse / blank IPC (unchanged) ----
   ipcMain.on(IPC.VERSE_PUSH_LIVE, (_event, verse: VerseMatch) => {
     outputState.live = true;
     outputState.verse = verse;
@@ -87,15 +142,56 @@ app.whenReady().then(() => {
     outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
   });
 
-  // LOGO/BLACK/CLEAR — this is what actually blanks the real projector/OBS
-  // output, not just a visual toggle in the operator's own window.
   ipcMain.on(IPC.SET_BLANK_MODE, (_event, mode: BlankMode) => {
     outputState.blankMode = mode;
     outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
   });
 
-  // Real Bible lookups — backed by the full local KJV corpus (31,102 verses),
-  // not a hardcoded demo set. Renderer asks, main process answers.
+  // ---- Background IPC ----
+  ipcMain.handle(IPC.SET_BACKGROUND, (_event, source: BackgroundSource) => {
+    outputState.background = source;
+    outputState.blankMode = "none";
+    outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
+  });
+
+  ipcMain.handle(IPC.CLEAR_BACKGROUND, () => {
+    outputState.background = null;
+    outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
+  });
+
+  ipcMain.handle(IPC.BACKGROUNDS_LIST, async () => {
+    return readMeta();
+  });
+
+  ipcMain.handle(IPC.BACKGROUNDS_IMPORT, async () => {
+    const result = await dialog.showOpenDialog(operatorWindow!, {
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        {
+          name: "Images & Videos",
+          extensions: ["jpg", "jpeg", "png", "gif", "webp", "mp4", "mov", "webm"],
+        },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return [];
+    return importFiles(result.filePaths);
+  });
+
+  ipcMain.handle(IPC.BACKGROUNDS_DELETE, async (_event, id: string) => {
+    const meta = await readMeta();
+    const idx = meta.findIndex((b) => b.id === id);
+    if (idx === -1) return;
+    const [item] = meta.splice(idx, 1);
+    await writeMeta(meta);
+    try { await fs.unlink(join(backgroundsDir, item.fileName)); } catch { /* ok */ }
+
+    if (outputState.background?.fileName === item.fileName) {
+      outputState.background = null;
+      outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
+    }
+  });
+
+  // ---- Bible IPC ----
   ipcMain.handle(
     IPC.BIBLE_GET_CHAPTER,
     (_event, book: string, chapter: number) => {
@@ -104,6 +200,14 @@ app.whenReady().then(() => {
   );
   ipcMain.handle(IPC.BIBLE_SEARCH, (_event, query: string) => {
     return smartSearch(query, 20);
+  });
+
+  ipcMain.handle(IPC.BIBLE_PHRASE_SEARCH, (_event, query: string) => {
+    return phraseSearch(query, 10);
+  });
+
+  ipcMain.handle(IPC.BIBLE_GET_BOOKS, () => {
+    return getBookList();
   });
 
   ipcMain.handle(
