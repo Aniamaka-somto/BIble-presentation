@@ -2034,21 +2034,22 @@
       };
 
       // ---- Search autocomplete (EasyWorship-style) ----
+      // Phases: book → chapter → verse. Space transitions between them.
+      // No default " 1:1" suffix — user must type or accept defaults on Enter.
       let searchBooks = [];
-      let searchField = "book"; // "book" | "chapter" | "verse"
+      let searchPhase = "book";
       let searchBookName = "";
+      let searchChapter = "";
+      let searchVerse = "";
 
       function findBook(prefix) {
         const lower = prefix.toLowerCase().replace(/\s+/g, "");
-        // Direct prefix match on full book name
         for (const b of searchBooks) {
           const key = b.name.toLowerCase().replace(/\s+/g, "");
           if (key.startsWith(lower)) return b;
         }
-        // Try alias
         const alias = bookAliases[lower];
         if (alias) return searchBooks.find((b) => b.name === alias);
-        // Strip number prefix ("1cor" → "cor")
         const noNum = lower.replace(/^\d/, "");
         if (noNum !== lower) {
           for (const b of searchBooks) {
@@ -2059,9 +2060,23 @@
         return null;
       }
 
-      function canExtendChapter(book, digits) {
-        if (digits.length === 0) return true;
-        return parseInt(digits + "0", 10) <= book.chapters;
+      function commitSearch() {
+        const ch = parseInt(searchChapter || "1", 10);
+        const vs = parseInt(searchVerse || "1", 10);
+        if (!searchBookName) return;
+        loadAndStage(searchBookName, ch, vs);
+        searchPhase = "book";
+        searchBookName = "";
+        searchChapter = "";
+        searchVerse = "";
+      }
+
+      let _sup = false;
+
+      function setInput(v) {
+        _sup = true;
+        document.getElementById("libSearchInput").value = v;
+        _sup = false;
       }
 
       document.getElementById("libSearchInput").addEventListener("focus", async function () {
@@ -2071,117 +2086,97 @@
       });
 
       document.getElementById("libSearchInput").addEventListener("keydown", function (e) {
-        if (e.key === "ArrowRight" && this.selectionStart < this.value.length) {
-          // Commit highlighted field
-          const val = this.value;
-          const cursor = this.selectionStart;
-          const textEnd = val.search(/\d/);
-          const textPart = textEnd === -1 ? val : val.slice(0, textEnd).trim();
-          const numPart = textEnd === -1 ? "" : val.slice(textEnd);
-
-          if (searchField === "book" && searchBookName) {
-            // Commit book, start chapter
-            const rest = val.slice(textPart.length);
-            this.value = searchBookName + (numPart || ":1");
-            searchField = "chapter";
-            const start = searchBookName.length + 1;
-            this.setSelectionRange(start, this.value.length);
-          } else if (searchField === "chapter" && numPart) {
-            // Commit chapter, start verse
-            searchField = "verse";
-            const start = val.length;
-            this.setSelectionRange(start, start);
-          }
+        if (e.key === " ") {
           e.preventDefault();
-          return;
+
+          if (searchPhase === "book" && searchBookName) {
+            // Commit book, move to chapter
+            searchPhase = "chapter";
+            setInput(searchBookName + " ");
+            return;
+          }
+
+          if (searchPhase === "chapter" && searchChapter) {
+            // Commit chapter, move to verse
+            searchPhase = "verse";
+            setInput(searchBookName + " " + searchChapter + ":");
+            return;
+          }
+
+          if (searchPhase === "verse" && searchVerse) {
+            // Full reference entered — load
+            commitSearch();
+            setInput("");
+            return;
+          }
         }
 
         if (e.key === "Enter") {
-          const q = this.value.trim();
-          const match = q.match(/^(\d?\s?[A-Za-z\s]+?)\s*(\d+)?(?::(\d+))?$/);
-          if (!match) {
-            this.style.borderColor = "var(--live-red)";
+          e.preventDefault();
+          commitSearch();
+          setInput("");
+          return;
+        }
+
+        if (e.key === "Backspace") {
+          if (searchPhase === "verse" && !searchVerse && searchChapter) {
+            // Back from verse to chapter
+            searchPhase = "chapter";
+            setInput(searchBookName + " " + searchChapter);
             return;
           }
-          let bookName = match[1].trim();
-          const lower = bookName.toLowerCase().replace(/\s+/g, "");
-          const found = findBook(lower);
-          if (found) bookName = found.name;
-          else {
-            const alias = bookAliases[lower];
-            if (alias) bookName = alias;
+          if (searchPhase === "chapter" && !searchChapter && searchBookName) {
+            // Back from chapter to book
+            searchPhase = "book";
+            setInput(searchBookName);
+            return;
           }
-          const chapter = match[2] ? parseInt(match[2], 10) : 1;
-          const verse = match[3] ? parseInt(match[3], 10) : 1;
-          loadAndStage(bookName, chapter, verse);
-          this.style.borderColor = "";
-          searchField = "book";
-          searchBookName = "";
-          return;
         }
       });
 
       document.getElementById("libSearchInput").addEventListener("input", function () {
+        if (_sup) return;
         const val = this.value;
         const cursor = this.selectionStart;
 
-        const textEnd = val.search(/\d/);
-        const textPart = textEnd === -1 ? val : val.slice(0, textEnd).trim();
-        const numPart = textEnd === -1 ? "" : val.slice(textEnd);
-
-        if (textPart.length === 0) {
-          searchField = "book";
-          searchBookName = "";
-          return;
-        }
-
-        const book = findBook(textPart);
-        if (!book || !book.name.toLowerCase().startsWith(textPart.toLowerCase())) {
-          searchBookName = book ? book.name : "";
-          return;
-        }
-
-        searchBookName = book.name;
-
-        // Build the completion: book name + default chapter:verse or user's numbers
-        const restOfBook = book.name.slice(textPart.length);
-        let suffix = numPart ? "" : " 1:1";
-        let chapterStr = "";
-        let verseStr = "";
-
-        if (numPart) {
-          // Parse digits — first is chapter, after colon or space is verse
-          const colonIdx = numPart.indexOf(":");
-          if (colonIdx !== -1) {
-            chapterStr = numPart.slice(0, colonIdx);
-            verseStr = numPart.slice(colonIdx + 1);
-          } else {
-            // Could be chapter only, or chapter+verse without separator
-            // If the digits can't extend to a valid chapter, treat as verse
-            const digits = numPart;
-            if (canExtendChapter(book, digits)) {
-              chapterStr = digits;
-            } else {
-              chapterStr = digits;
-            }
+        if (searchPhase === "book") {
+          const letters = val.replace(/[^a-zA-Z\s]/g, "").trim();
+          if (!letters) {
+            searchBookName = "";
+            return;
           }
-          suffix = ":" + (verseStr || "1");
+          const book = findBook(letters);
+          if (!book) return;
+          searchBookName = book.name;
+          const completed = book.name.slice(letters.length);
+          if (completed) {
+            setInput(book.name);
+            this.setSelectionRange(letters.length, book.name.length);
+          } else {
+            // User typed the full book name — still in book phase until Space
+            setInput(book.name);
+            this.setSelectionRange(book.name.length, book.name.length);
+          }
+          return;
         }
 
-        const newValue = book.name + (chapterStr ? " " + chapterStr : "") + suffix;
-        if (newValue === this.value && this.selectionStart === this.value.length) return;
+        if (searchPhase === "chapter") {
+          const digits = val.replace(/[^\d]/g, "");
+          searchChapter = digits;
+          setInput(searchBookName + " " + digits);
+          const el = document.getElementById("libSearchInput");
+          el.setSelectionRange(el.value.length, el.value.length);
+          return;
+        }
 
-        this.value = newValue;
-
-        // Select the auto-completed portion (everything after what user typed past the book)
-        if (!numPart) {
-          // Select from end of user's typed book prefix to end
-          const lastSpace = this.value.indexOf(" ", textPart.length - 1);
-          const start = lastSpace !== -1 ? lastSpace + 1 : textPart.length + restOfBook.length + 1;
-          this.setSelectionRange(start, this.value.length);
-        } else {
-          const start = this.value.length;
-          this.setSelectionRange(start, start);
+        if (searchPhase === "verse") {
+          const prefix = searchBookName + " " + searchChapter + ":";
+          const digits = val.slice(prefix.length).replace(/[^\d]/g, "");
+          searchVerse = digits;
+          setInput(prefix + digits);
+          const el = document.getElementById("libSearchInput");
+          el.setSelectionRange(el.value.length, el.value.length);
+          return;
         }
       });
 
@@ -2347,12 +2342,36 @@
         nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
         sixty: 60, seventy: 70, eighty: 80, ninety: 90,
       };
+      const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+      const UNITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
 
       function normalizeNumbers(text) {
-        return text.replace(
+        let result = text;
+
+        // 1. Compound tens+units: "twenty two" / "twenty-two" → "22"
+        result = result.replace(
+          /\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\s-]+(one|two|three|four|five|six|seven|eight|nine)\b/gi,
+          (_, tens, units) => String(TENS[tens.toLowerCase()] + UNITS[units.toLowerCase()]),
+        );
+
+        // 2. Compound hundreds: "one hundred" → "100", "two hundred and five" → "205"
+        result = result.replace(
+          /\b(one|two|three|four|five|six|seven|eight|nine)\s+hundred(?:\s+and\s+)?(?:(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\s-]+(one|two|three|four|five|six|seven|eight|nine))?)?\b/gi,
+          (_, hundreds, tens, units) => {
+            let n = UNITS[hundreds.toLowerCase()] * 100;
+            if (tens) n += TENS[tens.toLowerCase()];
+            if (units) n += UNITS[units.toLowerCase()];
+            return String(n);
+          },
+        );
+
+        // 3. Standalone number words (existing logic)
+        result = result.replace(
           /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\b/gi,
           (m) => NUMBER_WORDS[m.toLowerCase()] ?? m,
         );
+
+        return result;
       }
 
       // Matches both written and spoken reference patterns:
