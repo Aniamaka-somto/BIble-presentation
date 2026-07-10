@@ -1,5 +1,5 @@
 import {
-  app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog, protocol, net,
+  app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog, protocol, net, powerSaveBlocker,
 } from "electron";
 import { join, extname, basename } from "path";
 import { pathToFileURL } from "url";
@@ -16,6 +16,7 @@ import { getChapter, smartSearch, phraseSearch, paraphraseSearch, getBookList } 
 
 let operatorWindow: BrowserWindow | null = null;
 let outputWindow: BrowserWindow | null = null;
+let sleepBlockerId: number | null = null;
 const backgroundsDir = join(app.getPath("userData"), "backgrounds");
 const metaPath = join(backgroundsDir, "meta.json");
 
@@ -50,7 +51,9 @@ function createOperatorWindow() {
 function createOutputWindow() {
   const displays = screen.getAllDisplays();
   const target =
-    displays.find((d) => d.id !== screen.getPrimaryDisplay().id) ?? displays[0];
+    displays.length > 1
+      ? displays.find((d) => d.id !== screen.getPrimaryDisplay().id)!
+      : displays[0];
 
   outputWindow = new BrowserWindow({
     x: target.bounds.x,
@@ -58,7 +61,9 @@ function createOutputWindow() {
     width: target.bounds.width,
     height: target.bounds.height,
     frame: false,
-    fullscreen: displays.length > 1,
+    kiosk: true,
+    skipTaskbar: true,
+    resizable: false,
     title: "Scripture Caster — Live Output",
     backgroundColor: "#0c0a08",
     webPreferences: {
@@ -66,6 +71,11 @@ function createOutputWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Hide cursor over the output
+  outputWindow.webContents.on("did-finish-load", () => {
+    outputWindow?.webContents.insertCSS("html, body { cursor: none !important; }");
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -119,6 +129,9 @@ async function importFiles(srcPaths: string[]): Promise<BackgroundItem[]> {
 
 app.whenReady().then(async () => {
   await ensureBackgroundsDir();
+
+  // Prevent display sleep while output is active (e.g. during a service)
+  sleepBlockerId = powerSaveBlocker.start("prevent-display-sleep");
 
   // bg:// protocol serves background media files
   protocol.handle("bg", (request) => {
@@ -232,6 +245,12 @@ app.whenReady().then(async () => {
       createOutputWindow();
     }
   });
+});
+
+app.on("before-quit", () => {
+  if (sleepBlockerId != null && powerSaveBlocker.isStarted(sleepBlockerId)) {
+    powerSaveBlocker.stop(sleepBlockerId);
+  }
 });
 
 app.on("window-all-closed", () => {

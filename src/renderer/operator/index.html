@@ -648,6 +648,7 @@
         flex-direction: column;
         padding: 20px 30px 18px;
         overflow: hidden;
+        container-type: inline-size;
       }
 
       .stage-head {
@@ -720,9 +721,10 @@
         max-width: 640px;
         font-family: "Fraunces", serif;
         font-weight: 500;
-        font-size: clamp(17px, 2vw, 27px);
+        font-size: clamp(18px, 4.2cqi, 64px);
         line-height: 1.45;
         color: var(--text-hi);
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
       }
       .stage-verse .num {
         font-size: 0.5em;
@@ -734,10 +736,12 @@
       }
       .stage-cite {
         margin-top: 16px;
-        font-size: 14px;
-        color: var(--text-mid);
-        font-style: italic;
-        font-family: "Fraunces", serif;
+        font-size: clamp(9px, 1.1cqi, 20px);
+        font-family: "JetBrains Mono", monospace;
+        letter-spacing: 0.1em;
+        color: #93a9ff;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+        font-style: normal;
       }
 
       .stage-foot {
@@ -812,6 +816,7 @@
         flex-direction: column;
         overflow: hidden;
         position: relative;
+        container-type: inline-size;
       }
       .split-pane.live-pane {
         border-color: rgba(255, 84, 112, 0.4);
@@ -837,6 +842,7 @@
       .split-pane-body {
         flex: 1;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
@@ -862,10 +868,11 @@
       }
       .split-verse {
         font-family: "Fraunces", serif;
-        font-size: clamp(14px, 1.5vw, 19px);
+        font-size: clamp(14px, 4.2cqi, 64px);
         line-height: 1.45;
         color: var(--text-hi);
         max-width: 90%;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
       }
       .split-verse .num {
         font-size: 0.55em;
@@ -873,6 +880,14 @@
         color: var(--blue-2);
         font-weight: 700;
         font-family: "Inter";
+      }
+      .split-cite {
+        margin-top: 10px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: clamp(7px, 1.1cqi, 16px);
+        letter-spacing: 0.1em;
+        color: #93a9ff;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
       }
 
       .app.split-mode .stage {
@@ -1603,6 +1618,7 @@
                   <span class="num">18</span>And Zacharias said unto the angel,
                   Whereby shall I know this? For I am an old man.
                 </div>
+                <div class="split-cite" id="splitPreviewCite">LUKE 1:18 · KJV</div>
               </div>
             </div>
             <div class="split-pane live-pane">
@@ -1615,6 +1631,7 @@
                   <span class="num">17</span>He will also go before Him in the
                   spirit and power of Elijah.
                 </div>
+                <div class="split-cite" id="splitLiveCite">LUKE 1:17 · KJV</div>
               </div>
             </div>
           </div>
@@ -1842,33 +1859,6 @@
     </div>
 
     <script>
-      let stageRefWidth = null;
-
-      function computeStageFontSize() {
-        const vw = window.innerWidth;
-        return Math.min(27, Math.max(17, vw * 0.02));
-      }
-
-      function updateSplitFontSize() {
-        const isSplit = document.getElementById("app").classList.contains("split-mode");
-        if (!isSplit) {
-          document.querySelectorAll(".split-verse").forEach((el) => el.style.fontSize = "");
-          return;
-        }
-        const wrap = document.getElementById("stageWrap");
-        const wrapW = wrap.offsetWidth;
-        if (!stageRefWidth) stageRefWidth = wrapW;
-        const pane = document.querySelector(".split-pane");
-        if (!pane) return;
-        const paneW = pane.offsetWidth;
-        const ratio = paneW / stageRefWidth;
-        const stageFs = computeStageFontSize();
-        const paneFs = Math.round(stageFs * ratio);
-        document.querySelectorAll(".split-verse").forEach((el) => {
-          el.style.fontSize = paneFs + "px";
-        });
-      }
-
       document
         .getElementById("outputModeToggle")
         .addEventListener("click", (e) => {
@@ -1878,22 +1868,10 @@
             .querySelectorAll("#outputModeToggle button")
             .forEach((b) => b.classList.remove("on"));
           btn.classList.add("on");
-          const willBeSplit = btn.dataset.mode === "split";
-
-          if (willBeSplit) {
-            const stage = document.getElementById("stage");
-            stageRefWidth = stage.offsetWidth;
-          }
-
           document
             .getElementById("app")
-            .classList.toggle("split-mode", willBeSplit);
-
-          requestAnimationFrame(() => updateSplitFontSize());
+            .classList.toggle("split-mode", btn.dataset.mode === "split");
         });
-
-      const resizeObs = new ResizeObserver(() => updateSplitFontSize());
-      resizeObs.observe(document.getElementById("stageWrap"));
 
       const lbc = {
         logo: document.getElementById("logoBtn"),
@@ -1980,12 +1958,14 @@
         document.getElementById("stageRef").textContent = v.ref;
         document.getElementById("stageVerse").innerHTML =
           '<span class="num">' + v.n + "</span>" + v.text;
-        document.getElementById("stageCite").textContent =
-          v.ref.replace(v.book.toUpperCase(), v.book) + " · King James Version";
+        document.getElementById("stageCite").innerHTML =
+          v.ref + " \u00b7 KJV";
         document.getElementById("navLabel").textContent =
           "verse " + v.n + " of " + Object.keys(verseData).length;
         document.getElementById("splitPreviewVerse").innerHTML =
           '<span class="num">' + v.n + "</span>" + v.text;
+        document.getElementById("splitPreviewCite").textContent =
+          v.ref + " \u00b7 KJV";
       }
 
       function attachVcardHandler(card) {
@@ -2789,6 +2769,8 @@
         setStageState(true);
         document.getElementById("splitLiveVerse").innerHTML =
           document.getElementById("stageVerse").innerHTML;
+        document.getElementById("splitLiveCite").textContent =
+          document.getElementById("stageCite").textContent;
         applyBlankMode("none"); // pushing live should un-blank the output, not push behind a black/logo screen
 
         if (window.scriptureCaster && stagedVerse) {
