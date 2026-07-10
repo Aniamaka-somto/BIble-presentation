@@ -801,7 +801,6 @@
       /* split output mode — two real panes for churches with two physical outputs */
       .split-stage {
         display: none;
-        height: 100%;
         gap: 12px;
       }
       .split-pane {
@@ -881,6 +880,14 @@
       }
       .app.split-mode .split-stage {
         display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        height: 100%;
+        max-height: 100%;
+      }
+      .app.split-mode .split-pane {
+        aspect-ratio: 16 / 9;
       }
       .btn {
         font-size: 13px;
