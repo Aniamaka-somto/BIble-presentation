@@ -2105,6 +2105,7 @@
       let searchBookName = "";
       let searchChapter = "";
       let searchVerse = "";
+      let searchMaxVerse = 0;
 
       function findBook(prefix) {
         const lower = prefix.toLowerCase().replace(/\s+/g, "");
@@ -2128,11 +2129,35 @@
         const ch = parseInt(searchChapter || "1", 10);
         const vs = parseInt(searchVerse || "1", 10);
         if (!searchBookName) return;
-        loadAndStage(searchBookName, ch, vs);
+        const book = searchBooks.find((b) => b.name === searchBookName);
+        if (!book || ch < 1 || ch > book.chapters) {
+          resetSearch();
+          return;
+        }
+        if (searchVerse) {
+          window.scriptureCaster
+            .getChapter(searchBookName, ch)
+            .then((verses) => {
+              if (!verses.find((v) => v.verse === vs)) {
+                resetSearch();
+                return;
+              }
+              loadAndStage(searchBookName, ch, vs);
+              resetSearch();
+            })
+            .catch(() => resetSearch());
+        } else {
+          loadAndStage(searchBookName, ch, vs);
+          resetSearch();
+        }
+      }
+
+      function resetSearch() {
         searchPhase = "book";
         searchBookName = "";
         searchChapter = "";
         searchVerse = "";
+        searchMaxVerse = 0;
       }
 
       let _sup = false;
@@ -2161,7 +2186,14 @@
           }
 
           if (searchPhase === "chapter" && searchChapter) {
-            // Commit chapter, move to verse
+            const ch = parseInt(searchChapter, 10);
+            const book = searchBooks.find((b) => b.name === searchBookName);
+            if (!book || ch < 1 || ch > book.chapters) return;
+            searchMaxVerse = 0;
+            window.scriptureCaster
+              .getChapter(searchBookName, ch)
+              .then((verses) => { searchMaxVerse = verses.length; })
+              .catch(() => {});
             searchPhase = "verse";
             setInput(searchBookName + " " + searchChapter + ":");
             return;
@@ -2226,8 +2258,18 @@
 
         if (searchPhase === "chapter") {
           const digits = val.replace(/[^\d]/g, "");
-          searchChapter = digits;
-          setInput(searchBookName + " " + digits);
+          if (digits) {
+            const ch = parseInt(digits, 10);
+            const book = searchBooks.find((b) => b.name === searchBookName);
+            if (book && ch > book.chapters) {
+              searchChapter = digits.slice(0, -1);
+            } else {
+              searchChapter = digits;
+            }
+          } else {
+            searchChapter = "";
+          }
+          setInput(searchBookName + " " + searchChapter);
           const el = document.getElementById("libSearchInput");
           el.setSelectionRange(el.value.length, el.value.length);
           return;
@@ -2236,8 +2278,13 @@
         if (searchPhase === "verse") {
           const prefix = searchBookName + " " + searchChapter + ":";
           const digits = val.slice(prefix.length).replace(/[^\d]/g, "");
-          searchVerse = digits;
-          setInput(prefix + digits);
+          if (digits && searchMaxVerse > 0) {
+            const vs = parseInt(digits, 10);
+            searchVerse = vs > searchMaxVerse ? digits.slice(0, -1) : digits;
+          } else {
+            searchVerse = digits;
+          }
+          setInput(prefix + searchVerse);
           const el = document.getElementById("libSearchInput");
           el.setSelectionRange(el.value.length, el.value.length);
           return;
