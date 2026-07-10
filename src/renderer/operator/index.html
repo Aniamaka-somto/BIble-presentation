@@ -509,7 +509,9 @@
         padding: 9px 10px;
         gap: 10px;
       }
-      .bg-manager.show { display: flex; }
+      .bg-manager.show {
+        display: flex;
+      }
       .bg-header {
         display: flex;
         align-items: center;
@@ -532,7 +534,9 @@
         color: #fff;
         cursor: pointer;
       }
-      .bg-add-btn:hover { opacity: 0.85; }
+      .bg-add-btn:hover {
+        opacity: 0.85;
+      }
       .bg-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -551,9 +555,14 @@
         position: relative;
         aspect-ratio: 16 / 9;
       }
-      .bg-card:hover { border-color: var(--blue-2); }
-      .bg-card.active { border-color: var(--gold); }
-      .bg-card img, .bg-card video {
+      .bg-card:hover {
+        border-color: var(--blue-2);
+      }
+      .bg-card.active {
+        border-color: var(--gold);
+      }
+      .bg-card img,
+      .bg-card video {
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -567,7 +576,7 @@
         right: 0;
         font-size: 10px;
         padding: 4px 6px;
-        background: rgba(0,0,0,0.6);
+        background: rgba(0, 0, 0, 0.6);
         color: #ddd;
         white-space: nowrap;
         overflow: hidden;
@@ -581,7 +590,7 @@
         height: 20px;
         border-radius: 50%;
         border: none;
-        background: rgba(0,0,0,0.55);
+        background: rgba(0, 0, 0, 0.55);
         color: #fff;
         font-size: 12px;
         cursor: pointer;
@@ -590,8 +599,12 @@
         justify-content: center;
         line-height: 1;
       }
-      .bg-card:hover .bg-card-del { display: flex; }
-      .bg-card-del:hover { background: rgba(200,50,50,0.85); }
+      .bg-card:hover .bg-card-del {
+        display: flex;
+      }
+      .bg-card-del:hover {
+        background: rgba(200, 50, 50, 0.85);
+      }
       .bg-empty {
         grid-column: 1 / -1;
         display: flex;
@@ -604,10 +617,16 @@
         text-align: center;
         gap: 8px;
       }
-      .bg-empty svg { width: 40px; height: 40px; opacity: 0.3; }
+      .bg-empty svg {
+        width: 40px;
+        height: 40px;
+        opacity: 0.3;
+      }
 
-      /* Hide scripture panels when background tab is active */
-      .lib-search.hide, .lib-list.hide { display: none; }
+      .lib-search.hide,
+      .lib-list.hide {
+        display: none;
+      }
 
       /* ============ CENTER: STAGE ============ */
       .center-col {
@@ -711,20 +730,23 @@
         flex: 1;
         min-height: 0;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        padding: 8px 16px;
+        padding: 10px 30px;
         overflow: hidden;
       }
       .stage-verse {
-        max-width: 640px;
         font-family: "Fraunces", serif;
         font-weight: 500;
-        font-size: clamp(18px, 4.2cqi, 64px);
-        line-height: 1.45;
+        font-size: 42px;
+        line-height: 1.35;
         color: var(--text-hi);
         text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+        overflow-wrap: break-word;
+        word-break: break-word;
+        margin: 0;
       }
       .stage-verse .num {
         font-size: 0.5em;
@@ -735,13 +757,14 @@
         margin-right: 4px;
       }
       .stage-cite {
-        margin-top: 16px;
-        font-size: clamp(9px, 1.1cqi, 20px);
+        margin-top: 12px;
+        font-size: clamp(9px, 1.1cqi, 18px);
         font-family: "JetBrains Mono", monospace;
         letter-spacing: 0.1em;
         color: #93a9ff;
         text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
         font-style: normal;
+        flex-shrink: 0;
       }
 
       .stage-foot {
@@ -802,7 +825,7 @@
         gap: 8px;
       }
 
-      /* split output mode — two real panes for churches with two physical outputs */
+      /* ============ SPLIT VIEW PANELS ============ */
       .split-stage {
         display: none;
         gap: 12px;
@@ -841,12 +864,13 @@
       }
       .split-pane-body {
         flex: 1;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        padding: 16px;
+        padding: 8px 12px;
         overflow: hidden;
       }
       .split-bg {
@@ -868,11 +892,14 @@
       }
       .split-verse {
         font-family: "Fraunces", serif;
-        font-size: clamp(14px, 4.2cqi, 64px);
-        line-height: 1.45;
+        font-size: 28px;
+        line-height: 1.3;
         color: var(--text-hi);
-        max-width: 90%;
+        max-width: 95%;
         text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+        overflow-wrap: break-word;
+        word-break: break-word;
+        margin: 0;
       }
       .split-verse .num {
         font-size: 0.55em;
@@ -882,12 +909,13 @@
         font-family: "Inter";
       }
       .split-cite {
-        margin-top: 10px;
+        margin-top: 6px;
         font-family: "JetBrains Mono", monospace;
-        font-size: clamp(7px, 1.1cqi, 16px);
+        font-size: 12px;
         letter-spacing: 0.1em;
         color: #93a9ff;
         text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+        flex-shrink: 0;
       }
 
       .app.split-mode .stage {
@@ -1461,7 +1489,7 @@
           <div class="lib-tabs">
             <div class="lib-tab primary on" data-tab="scripture">Scripture</div>
             <div class="lib-tab" data-tab="songs">Songs</div>
-            <div class="lib-more" id="libMoreBtn">More ⌄</div>
+            <div class="lib-more" id="libMoreBtn">More</div>
           </div>
           <div class="lib-overflow" id="libOverflow">
             <div class="lib-tab" data-tab="media">Media</div>
@@ -1524,12 +1552,18 @@
             </div>
             <div class="bg-grid" id="bgGrid">
               <div class="bg-empty" id="bgEmpty">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <rect x="2" y="4" width="20" height="16" rx="2"/>
-                  <circle cx="9" cy="10" r="2"/>
-                  <path d="M22 14l-5-5L3 19"/>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                  <circle cx="9" cy="10" r="2" />
+                  <path d="M22 14l-5-5L3 19" />
                 </svg>
-                No backgrounds yet.<br/>Click "+ Add Background" to import images or videos.
+                No backgrounds yet.<br />Click "+ Add Background" to import
+                images or videos.
               </div>
             </div>
           </div>
@@ -1550,17 +1584,15 @@
                 <span class="kjv-tag">KJV</span>
               </div>
             </div>
-            <div class="stage-body">
-              <div>
-                <div class="stage-verse" id="stageVerse">
-                  <span class="num">17</span>And he shall go before him in the
-                  spirit and power of Elias, to turn the hearts of the fathers
-                  to the children, and the disobedient to the wisdom of the
-                  just; to make ready a people prepared for the Lord.
-                </div>
-                <div class="stage-cite" id="stageCite">
-                  Luke 1:17 · King James Version
-                </div>
+            <div class="stage-body" id="stageBody">
+              <div class="stage-verse" id="stageVerse">
+                <span class="num">17</span>And he shall go before him in the
+                spirit and power of Elias, to turn the hearts of the fathers to
+                the children, and the disobedient to the wisdom of the just; to
+                make ready a people prepared for the Lord.
+              </div>
+              <div class="stage-cite" id="stageCite">
+                Luke 1:17 · King James Version
               </div>
             </div>
             <div class="stage-foot">
@@ -1613,12 +1645,14 @@
               <div class="split-pane-head">
                 <span class="split-pane-label">Preview — next up</span>
               </div>
-              <div class="split-pane-body">
+              <div class="split-pane-body" id="splitPreviewBody">
                 <div class="split-verse" id="splitPreviewVerse">
                   <span class="num">18</span>And Zacharias said unto the angel,
                   Whereby shall I know this? For I am an old man.
                 </div>
-                <div class="split-cite" id="splitPreviewCite">LUKE 1:18 · KJV</div>
+                <div class="split-cite" id="splitPreviewCite">
+                  LUKE 1:18 · KJV
+                </div>
               </div>
             </div>
             <div class="split-pane live-pane">
@@ -1626,7 +1660,7 @@
               <div class="split-pane-head">
                 <span class="split-pane-label">Live — on screen now</span>
               </div>
-              <div class="split-pane-body">
+              <div class="split-pane-body" id="splitLiveBody">
                 <div class="split-verse" id="splitLiveVerse">
                   <span class="num">17</span>He will also go before Him in the
                   spirit and power of Elijah.
@@ -1760,8 +1794,8 @@
           <div class="feed-time">2 SEC AGO</div>
           <div class="card top">
             <div class="card-row">
-              <span class="card-ref">Luke 1:18</span
-              ><span class="tag explicit">Next likely</span>
+              <span class="card-ref">Luke 1:18</span>
+              <span class="tag explicit">Next likely</span>
             </div>
             <div class="card-snip">
               "...and Zacharias said unto the angel, whereby shall I know
@@ -1775,8 +1809,8 @@
           <div class="feed-time">41 SEC AGO</div>
           <div class="card">
             <div class="card-row">
-              <span class="card-ref">Jeremiah 29:11</span
-              ><span class="tag paraphrase">Paraphrase · 82%</span>
+              <span class="card-ref">Jeremiah 29:11</span>
+              <span class="tag paraphrase">Paraphrase · 82%</span>
             </div>
             <div class="card-snip">
               Pastor said: "I know the plans I have for you..."
@@ -1871,6 +1905,7 @@
           document
             .getElementById("app")
             .classList.toggle("split-mode", btn.dataset.mode === "split");
+          fitAllStageText();
         });
 
       const lbc = {
@@ -1879,6 +1914,7 @@
         clear: document.getElementById("clearBtn"),
       };
       const stageWrapEl = document.getElementById("stageWrap");
+
       function applyBlankMode(mode) {
         Object.values(lbc).forEach((x) => x.classList.remove("active"));
         stageWrapEl.classList.toggle("blacked", mode === "black");
@@ -1886,6 +1922,7 @@
         if (mode === "black") lbc.black.classList.add("active");
         if (window.scriptureCaster) window.scriptureCaster.setBlankMode(mode);
       }
+
       lbc.logo.addEventListener("click", () =>
         applyBlankMode(lbc.logo.classList.contains("active") ? "none" : "logo"),
       );
@@ -1895,6 +1932,7 @@
         ),
       );
       lbc.clear.addEventListener("click", () => applyBlankMode("none"));
+
       const liveToggle = document.getElementById("liveToggle");
       liveToggle.addEventListener("click", () => {
         const isOff = liveToggle.classList.toggle("off");
@@ -1902,6 +1940,7 @@
           ? "OFF AIR"
           : "ON AIR";
       });
+
       const alertsOverlay = document.getElementById("alertsOverlay");
       document
         .getElementById("alertsBtn")
@@ -1914,11 +1953,13 @@
       alertsOverlay.addEventListener("click", (e) => {
         if (e.target === alertsOverlay) alertsOverlay.classList.remove("show");
       });
+
       document
         .getElementById("libMoreBtn")
         .addEventListener("click", () =>
           document.getElementById("libOverflow").classList.toggle("show"),
         );
+
       document.querySelectorAll(".lib-tab").forEach((tab) => {
         tab.addEventListener("click", () => {
           document
@@ -1934,6 +1975,7 @@
           if (isBg) renderBackgrounds();
         });
       });
+
       document.querySelectorAll(".sched-item").forEach((item) => {
         item.addEventListener("click", () => {
           document
@@ -1942,6 +1984,7 @@
           item.classList.add("active");
         });
       });
+
       let verseData = {};
       let stagedVerse = null;
       const stateTag = document.getElementById("stateTag");
@@ -1958,14 +2001,14 @@
         document.getElementById("stageRef").textContent = v.ref;
         document.getElementById("stageVerse").innerHTML =
           '<span class="num">' + v.n + "</span>" + v.text;
-        document.getElementById("stageCite").innerHTML =
-          v.ref + " \u00b7 KJV";
+        document.getElementById("stageCite").innerHTML = v.ref + " \u00b7 KJV";
         document.getElementById("navLabel").textContent =
           "verse " + v.n + " of " + Object.keys(verseData).length;
         document.getElementById("splitPreviewVerse").innerHTML =
           '<span class="num">' + v.n + "</span>" + v.text;
         document.getElementById("splitPreviewCite").textContent =
           v.ref + " \u00b7 KJV";
+        fitAllStageText();
       }
 
       function attachVcardHandler(card) {
@@ -2004,8 +2047,6 @@
         });
       }
 
-      // Load the real chapter (all verses, not a hardcoded handful) from the
-      // full local KJV corpus via the main process.
       async function loadChapter(book, chapter, startLive) {
         const verses = await window.scriptureCaster.getChapter(book, chapter);
         verseData = {};
@@ -2030,60 +2071,83 @@
 
       loadChapter("Luke", 1, 17);
 
-      // Loads a chapter and stages the verse — no live marking, filmstrip scrolls to it.
       async function loadAndStage(book, chapter, verse) {
         await loadChapter(book, chapter, verse);
         document.querySelectorAll(".vcard").forEach((c) => {
           c.classList.remove("is-live");
-          const num = parseInt(c.querySelector(".vnum").textContent.replace(/\D/g, ""));
+          const num = parseInt(
+            c.querySelector(".vnum").textContent.replace(/\D/g, ""),
+          );
           c.classList.toggle("is-staged", num === verse);
         });
         setStageState(false);
         const card = document.querySelector(".vcard.is-staged");
-        if (card) card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        if (card)
+          card.scrollIntoView({
+            behavior: "smooth",
+            inline: "center",
+            block: "nearest",
+          });
       }
 
-      // ---- Prev/next arrows step through the chapter, staging each verse. ----
       function stepToVerse(targetNum) {
         const v = verseData[targetNum];
         if (!v) return;
         stagedVerse = v;
         document.querySelectorAll(".vcard").forEach((c) => {
-          const num = parseInt(c.querySelector(".vnum").textContent.replace(/\D/g, ""));
+          const num = parseInt(
+            c.querySelector(".vnum").textContent.replace(/\D/g, ""),
+          );
           c.classList.remove("is-staged");
-          if (num === targetNum && !c.classList.contains("is-live")) c.classList.add("is-staged");
+          if (num === targetNum && !c.classList.contains("is-live"))
+            c.classList.add("is-staged");
         });
         loadVerseIntoStage(v);
         setStageState(false);
         const cardEl = Array.from(document.querySelectorAll(".vcard")).find(
-          (c) => parseInt(c.querySelector(".vnum").textContent.replace(/\D/g, "")) === targetNum
+          (c) =>
+            parseInt(
+              c.querySelector(".vnum").textContent.replace(/\D/g, ""),
+            ) === targetNum,
         );
-        if (cardEl) cardEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        if (cardEl)
+          cardEl.scrollIntoView({
+            behavior: "smooth",
+            inline: "center",
+            block: "nearest",
+          });
       }
 
       document.getElementById("prevBtn").addEventListener("click", () => {
         if (!stagedVerse) return;
-        const keys = Object.keys(verseData).map(Number).sort((a, b) => a - b);
+        const keys = Object.keys(verseData)
+          .map(Number)
+          .sort((a, b) => a - b);
         const idx = keys.indexOf(stagedVerse.n);
         if (idx > 0) stepToVerse(keys[idx - 1]);
       });
 
       document.getElementById("nextBtn").addEventListener("click", () => {
         if (!stagedVerse) return;
-        const keys = Object.keys(verseData).map(Number).sort((a, b) => a - b);
+        const keys = Object.keys(verseData)
+          .map(Number)
+          .sort((a, b) => a - b);
         const idx = keys.indexOf(stagedVerse.n);
         if (idx < keys.length - 1) stepToVerse(keys[idx + 1]);
       });
 
-      // Left library list — clicking a row loads that chapter.
       document.getElementById("libList").addEventListener("click", (e) => {
         const row = e.target.closest(".lib-row");
         if (!row) return;
         loadChapter(row.dataset.book, parseInt(row.dataset.chapter), 1);
       });
 
-      // Left library search — reference-only by design (see: two search boxes
-      // solve different problems — "I know the address" vs "I remember the words").
+      // ==========================================
+      // SEARCH AUTOCOMPLETE (EasyWorship-style)
+      // Phases: book → chapter → verse, Space transitions between them.
+      // Typing invalid chapter/verse numbers is silently rejected.
+      // ==========================================
+
       const bookAliases = {
         ps: "Psalms",
         psalm: "Psalms",
@@ -2097,9 +2161,6 @@
         cor: "Corinthians",
       };
 
-      // ---- Search autocomplete (EasyWorship-style) ----
-      // Phases: book → chapter → verse. Space transitions between them.
-      // No default " 1:1" suffix — user must type or accept defaults on Enter.
       let searchBooks = [];
       let searchPhase = "book";
       let searchBookName = "";
@@ -2118,7 +2179,10 @@
         const noNum = lower.replace(/^\d/, "");
         if (noNum !== lower) {
           for (const b of searchBooks) {
-            const key = b.name.toLowerCase().replace(/^\d+\s+/, "").replace(/\s+/g, "");
+            const key = b.name
+              .toLowerCase()
+              .replace(/^\d+\s+/, "")
+              .replace(/\s+/g, "");
             if (key.startsWith(noNum)) return b;
           }
         }
@@ -2168,134 +2232,126 @@
         _sup = false;
       }
 
-      document.getElementById("libSearchInput").addEventListener("focus", async function () {
-        if (searchBooks.length === 0) {
-          searchBooks = await window.scriptureCaster.getBookList();
-        }
-      });
-
-      document.getElementById("libSearchInput").addEventListener("keydown", function (e) {
-        if (e.key === " ") {
-          e.preventDefault();
-
-          if (searchPhase === "book" && searchBookName) {
-            // Commit book, move to chapter
-            searchPhase = "chapter";
-            setInput(searchBookName + " ");
-            return;
+      document
+        .getElementById("libSearchInput")
+        .addEventListener("focus", async function () {
+          if (searchBooks.length === 0) {
+            searchBooks = await window.scriptureCaster.getBookList();
           }
+        });
 
-          if (searchPhase === "chapter" && searchChapter) {
-            const ch = parseInt(searchChapter, 10);
-            const book = searchBooks.find((b) => b.name === searchBookName);
-            if (!book || ch < 1 || ch > book.chapters) return;
-            searchMaxVerse = 0;
-            window.scriptureCaster
-              .getChapter(searchBookName, ch)
-              .then((verses) => { searchMaxVerse = verses.length; })
-              .catch(() => {});
-            searchPhase = "verse";
-            setInput(searchBookName + " " + searchChapter + ":");
-            return;
+      document
+        .getElementById("libSearchInput")
+        .addEventListener("keydown", function (e) {
+          if (e.key === " ") {
+            e.preventDefault();
+            if (searchPhase === "book" && searchBookName) {
+              searchPhase = "chapter";
+              setInput(searchBookName + " ");
+              return;
+            }
+            if (searchPhase === "chapter" && searchChapter) {
+              const ch = parseInt(searchChapter, 10);
+              const book = searchBooks.find((b) => b.name === searchBookName);
+              if (!book || ch < 1 || ch > book.chapters) return;
+              searchMaxVerse = 0;
+              window.scriptureCaster
+                .getChapter(searchBookName, ch)
+                .then((verses) => {
+                  searchMaxVerse = verses.length;
+                })
+                .catch(() => {});
+              searchPhase = "verse";
+              setInput(searchBookName + " " + searchChapter + ":");
+              return;
+            }
+            if (searchPhase === "verse" && searchVerse) {
+              commitSearch();
+              setInput("");
+              return;
+            }
           }
-
-          if (searchPhase === "verse" && searchVerse) {
-            // Full reference entered — load
+          if (e.key === "Enter") {
+            e.preventDefault();
             commitSearch();
             setInput("");
             return;
           }
-        }
-
-        if (e.key === "Enter") {
-          e.preventDefault();
-          commitSearch();
-          setInput("");
-          return;
-        }
-
-        if (e.key === "Backspace") {
-          if (searchPhase === "verse" && !searchVerse && searchChapter) {
-            // Back from verse to chapter
-            searchPhase = "chapter";
-            setInput(searchBookName + " " + searchChapter);
-            return;
-          }
-          if (searchPhase === "chapter" && !searchChapter && searchBookName) {
-            // Back from chapter to book
-            searchPhase = "book";
-            setInput(searchBookName);
-            return;
-          }
-        }
-      });
-
-      document.getElementById("libSearchInput").addEventListener("input", function () {
-        if (_sup) return;
-        const val = this.value;
-        const cursor = this.selectionStart;
-
-        if (searchPhase === "book") {
-          const letters = val.replace(/[^a-zA-Z\s]/g, "").trim();
-          if (!letters) {
-            searchBookName = "";
-            return;
-          }
-          const book = findBook(letters);
-          if (!book) return;
-          searchBookName = book.name;
-          const completed = book.name.slice(letters.length);
-          if (completed) {
-            setInput(book.name);
-            this.setSelectionRange(letters.length, book.name.length);
-          } else {
-            // User typed the full book name — still in book phase until Space
-            setInput(book.name);
-            this.setSelectionRange(book.name.length, book.name.length);
-          }
-          return;
-        }
-
-        if (searchPhase === "chapter") {
-          const digits = val.replace(/[^\d]/g, "");
-          if (digits) {
-            const ch = parseInt(digits, 10);
-            const book = searchBooks.find((b) => b.name === searchBookName);
-            if (book && ch > book.chapters) {
-              searchChapter = digits.slice(0, -1);
-            } else {
-              searchChapter = digits;
+          if (e.key === "Backspace") {
+            if (searchPhase === "verse" && !searchVerse && searchChapter) {
+              searchPhase = "chapter";
+              setInput(searchBookName + " " + searchChapter);
+              return;
             }
-          } else {
-            searchChapter = "";
+            if (searchPhase === "chapter" && !searchChapter && searchBookName) {
+              searchPhase = "book";
+              setInput(searchBookName);
+              return;
+            }
           }
-          setInput(searchBookName + " " + searchChapter);
-          const el = document.getElementById("libSearchInput");
-          el.setSelectionRange(el.value.length, el.value.length);
-          return;
-        }
+        });
 
-        if (searchPhase === "verse") {
-          const prefix = searchBookName + " " + searchChapter + ":";
-          const digits = val.slice(prefix.length).replace(/[^\d]/g, "");
-          if (digits && searchMaxVerse > 0) {
-            const vs = parseInt(digits, 10);
-            searchVerse = vs > searchMaxVerse ? digits.slice(0, -1) : digits;
-          } else {
-            searchVerse = digits;
+      document
+        .getElementById("libSearchInput")
+        .addEventListener("input", function () {
+          if (_sup) return;
+          const val = this.value;
+          const cursor = this.selectionStart;
+
+          if (searchPhase === "book") {
+            const letters = val.replace(/[^a-zA-Z\s]/g, "").trim();
+            if (!letters) {
+              searchBookName = "";
+              return;
+            }
+            const book = findBook(letters);
+            if (!book) return;
+            searchBookName = book.name;
+            const completed = book.name.slice(letters.length);
+            if (completed) {
+              setInput(book.name);
+              this.setSelectionRange(letters.length, book.name.length);
+            } else {
+              setInput(book.name);
+              this.setSelectionRange(book.name.length, book.name.length);
+            }
+            return;
           }
-          setInput(prefix + searchVerse);
-          const el = document.getElementById("libSearchInput");
-          el.setSelectionRange(el.value.length, el.value.length);
-          return;
-        }
-      });
+          if (searchPhase === "chapter") {
+            const digits = val.replace(/[^\d]/g, "");
+            if (digits) {
+              const ch = parseInt(digits, 10);
+              const book = searchBooks.find((b) => b.name === searchBookName);
+              if (book && ch > book.chapters) {
+                searchChapter = digits.slice(0, -1);
+              } else {
+                searchChapter = digits;
+              }
+            } else {
+              searchChapter = "";
+            }
+            setInput(searchBookName + " " + searchChapter);
+            const el = document.getElementById("libSearchInput");
+            el.setSelectionRange(el.value.length, el.value.length);
+            return;
+          }
+          if (searchPhase === "verse") {
+            const prefix = searchBookName + " " + searchChapter + ":";
+            const digits = val.slice(prefix.length).replace(/[^\d]/g, "");
+            if (digits && searchMaxVerse > 0) {
+              const vs = parseInt(digits, 10);
+              searchVerse = vs > searchMaxVerse ? digits.slice(0, -1) : digits;
+            } else {
+              searchVerse = digits;
+            }
+            setInput(prefix + searchVerse);
+            const el = document.getElementById("libSearchInput");
+            el.setSelectionRange(el.value.length, el.value.length);
+            return;
+          }
+        });
 
       // ============ AI DETECTION ENGINE ============
-      // Explicit-reference detection over a live Deepgram transcript. This is the
-      // first slice — paraphrase/semantic detection (no stated reference) comes next.
-
-      // Must match the book names in the KJV corpus exactly (src/lib/bible/kjv.json).
       const BOOK_NAMES = [
         "Genesis",
         "Exodus",
@@ -2364,7 +2420,6 @@
         "Jude",
         "Revelation",
       ];
-      // Common spoken/abbreviated forms -> canonical book name used in the corpus.
       const DETECT_ALIASES = {
         "1 samuel": "1 Samuel",
         "1st samuel": "1 Samuel",
@@ -2444,28 +2499,70 @@
       BOOK_NAMES.forEach((b) => bookLookup.set(b.toLowerCase(), b));
       Object.entries(DETECT_ALIASES).forEach(([k, v]) => bookLookup.set(k, v));
 
-      // Map spoken number words to digits so the regex only ever needs
-      // to match \d{1,3} for chapter and verse numbers.
+      // ==========================================
+      // SPOKEN NUMBER NORMALIZATION
+      // Converts word-numbers ("twenty two", "one hundred") to digits
+      // so the reference regex only needs to match \d{1,3}.
+      // ==========================================
+
       const NUMBER_WORDS = {
-        one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
-        eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
-        fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
-        nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
-        sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+        one: 1,
+        two: 2,
+        three: 3,
+        four: 4,
+        five: 5,
+        six: 6,
+        seven: 7,
+        eight: 8,
+        nine: 9,
+        ten: 10,
+        eleven: 11,
+        twelve: 12,
+        thirteen: 13,
+        fourteen: 14,
+        fifteen: 15,
+        sixteen: 16,
+        seventeen: 17,
+        eighteen: 18,
+        nineteen: 19,
+        twenty: 20,
+        thirty: 30,
+        forty: 40,
+        fifty: 50,
+        sixty: 60,
+        seventy: 70,
+        eighty: 80,
+        ninety: 90,
       };
-      const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
-      const UNITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+      const TENS = {
+        twenty: 20,
+        thirty: 30,
+        forty: 40,
+        fifty: 50,
+        sixty: 60,
+        seventy: 70,
+        eighty: 80,
+        ninety: 90,
+      };
+      const UNITS = {
+        one: 1,
+        two: 2,
+        three: 3,
+        four: 4,
+        five: 5,
+        six: 6,
+        seven: 7,
+        eight: 8,
+        nine: 9,
+      };
 
       function normalizeNumbers(text) {
         let result = text;
-
-        // 1. Compound tens+units: "twenty two" / "twenty-two" → "22"
         result = result.replace(
           /\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\s-]+(one|two|three|four|five|six|seven|eight|nine)\b/gi,
-          (_, tens, units) => String(TENS[tens.toLowerCase()] + UNITS[units.toLowerCase()]),
+          (_, tens, units) =>
+            String(TENS[tens.toLowerCase()] + UNITS[units.toLowerCase()]),
         );
-
-        // 2. Compound hundreds: "one hundred" → "100", "two hundred and five" → "205"
         result = result.replace(
           /\b(one|two|three|four|five|six|seven|eight|nine)\s+hundred(?:\s+and\s+)?(?:(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\s-]+(one|two|three|four|five|six|seven|eight|nine))?)?\b/gi,
           (_, hundreds, tens, units) => {
@@ -2475,38 +2572,29 @@
             return String(n);
           },
         );
-
-        // 3. Standalone number words (existing logic)
         result = result.replace(
           /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\b/gi,
           (m) => NUMBER_WORDS[m.toLowerCase()] ?? m,
         );
-
         return result;
       }
 
-      // Matches both written and spoken reference patterns:
-      //   "John 3:16"        "John chapter 3 verse 16"
-      //   "John 3 16"        "John 3 verse 16"
-      //   "1 John 3:16"      "first John chapter 3 verse 16"
-      //   "Song of Solomon 2:1"
+      // ==========================================
+      // DEEPGRAM REFERENCE DETECTION
+      // Matches spoken/written "Book chapter:verse" patterns in the
+      // live transcript after normalizing number words to digits.
+      // ==========================================
+
       const BOOK_CAPTURE =
-        '((?:[123](?:st|nd|rd)?\\s+)?(?:first\\s+|second\\s+|third\\s+)?' +
-        '[a-z]+(?:\\s+of\\s+[a-z]+)?)';
+        "((?:[123](?:st|nd|rd)?\\s+)?(?:first\\s+|second\\s+|third\\s+)?[a-z]+(?:\\s+of\\s+[a-z]+)?)";
       const REF_PATTERN = new RegExp(
-        '\\b' +
-        BOOK_CAPTURE +
-        '(?:\\s+chapter)?' +
-        '\\s+(\\d{1,3})' +
-        '(?:\\s*:\\s*|\\s+verse\\s+|\\s+)' +
-        '(\\d{1,3})\\b',
-        'gi',
+        "\\b" +
+          BOOK_CAPTURE +
+          "(?:\\s+chapter)?\\s+(\\d{1,3})(?:\\s*:\\s*|\\s+verse\\s+|\\s+)(\\d{1,3})\\b",
+        "gi",
       );
 
       function detectReferences(text) {
-        // Normalize all number words to digits first ("two" → "2", "three" → "3").
-        // This catches whatever forms smart_format didn't convert, and makes the
-        // regex trivial — it only ever needs to match digits for chapter/verse.
         const normalized = normalizeNumbers(text);
         const found = [];
         let m;
@@ -2526,41 +2614,41 @@
       }
 
       const asstFeed = document.querySelector(".asst-feed");
-
-      // Dedupe: avoid showing the same candidate set via paraphrase within 30s
       let recentParaphraseKey = null;
       let recentParaphraseTime = 0;
       const PARAPHRASE_COOLDOWN_MS = 30000;
       const MAX_PARAPHRASE_MATCHES = 4;
 
       async function paraphraseScout(text) {
-        if (recentParaphraseKey && Date.now() - recentParaphraseTime < PARAPHRASE_COOLDOWN_MS) {
+        if (
+          recentParaphraseKey &&
+          Date.now() - recentParaphraseTime < PARAPHRASE_COOLDOWN_MS
+        )
           return [];
-        }
-
-        // paraphraseSearch now handles both exact phrase matching (punctuation-agnostic)
-        // and loose word-overlap with order/proximity scoring — one call covers both.
         let candidates = await window.scriptureCaster.paraphraseSearch(text);
-
         if (candidates.length === 0) return [];
-
         candidates = candidates
           .sort((a, b) => b.score - a.score)
           .slice(0, MAX_PARAPHRASE_MATCHES);
-
-        // Dedupe on the whole set so adding/removing a candidate re-fires
         const key = candidates
           .map((c) => `${c.book} ${c.chapter}:${c.verse}`)
           .sort()
           .join("|");
         if (key === recentParaphraseKey) return [];
-
         recentParaphraseKey = key;
         recentParaphraseTime = Date.now();
         return candidates;
       }
 
-      async function addDetectionCard(book, chapter, verse, snippet, isTop, isParaphrase, score) {
+      async function addDetectionCard(
+        book,
+        chapter,
+        verse,
+        snippet,
+        isTop,
+        isParaphrase,
+        score,
+      ) {
         const verseObj = await window.scriptureCaster
           .getChapter(book, chapter)
           .then((vs) => vs.find((v) => v.verse === verse));
@@ -2572,16 +2660,21 @@
         card.className = "card" + (isTop ? " top" : "");
         card.innerHTML =
           '<div class="card-row"><span class="card-ref">' +
-           book +
+          book +
           " " +
           chapter +
           ":" +
           verse +
-          '</span><span class="tag ' + (isParaphrase ? 'paraphrase' : 'explicit') + '">' + (isParaphrase ? 'Paraphrase' + (score != null ? ' \u00B7 ' + Math.round(score * 100) + '%' : '') : 'Reference') + '</span></div>' +
-          '<div class="card-snip">' +
+          '</span><span class="tag ' +
+          (isParaphrase ? "paraphrase" : "explicit") +
+          '">' +
+          (isParaphrase
+            ? "Paraphrase" +
+              (score != null ? " \u00B7 " + Math.round(score * 100) + "%" : "")
+            : "Reference") +
+          '</span></div><div class="card-snip">' +
           verseObj.text +
-          '</div>' +
-          '<div class="card-actions"><div class="mini-btn">Preview</div><div class="mini-btn primary">Push live</div></div>';
+          '</div><div class="card-actions"><div class="mini-btn">Preview</div><div class="mini-btn primary">Push live</div></div>';
         const [previewBtn, pushBtn] = card.querySelectorAll(".mini-btn");
         previewBtn.addEventListener("click", async () => {
           await loadAndStage(book, chapter, verse);
@@ -2594,7 +2687,12 @@
         asstFeed.insertBefore(card, timeEl);
       }
 
-      // ---- Deepgram streaming (needs your own API key — see README) ----
+      // ==========================================
+      // DEEPGRAM STREAMING (real-time speech-to-text)
+      // Uses MediaRecorder + WebSocket to send browser mic audio to
+      // Deepgram's Nova-2 model for live transcription.
+      // ==========================================
+
       let dgSocket = null;
       let mediaRecorder = null;
       let audioStream = null;
@@ -2630,18 +2728,16 @@
 
       function getBestMimeType() {
         const types = [
-          'audio/webm;codecs=opus',
-          'audio/webm',
-          'audio/ogg;codecs=opus',
+          "audio/webm;codecs=opus",
+          "audio/webm",
+          "audio/ogg;codecs=opus",
         ];
         for (const t of types) {
           if (MediaRecorder.isTypeSupported(t)) return t;
         }
-        return '';
+        return "";
       }
 
-      // Browser mic defaults (48kHz stereo Opus) work best for WebM containers
-      // — let Deepgram auto-detect the format rather than forcing a resample.
       const AUDIO_CONSTRAINTS = {
         echoCancellation: true,
         noiseSuppression: true,
@@ -2651,17 +2747,14 @@
       async function startListening() {
         const key = await getDeepgramKey();
         if (!key) return;
-
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+        audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: AUDIO_CONSTRAINTS,
+        });
         if (!audioStream) return;
-
-        // Nova-2 is Deepgram's most accurate model. The website defaults to it;
-        // the API defaults to a much weaker base model unless you opt in.
         const mimeType = getBestMimeType();
         const url =
           "wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&sample_rate=48000";
         dgSocket = new WebSocket(url, ["token", key]);
-
         dgSocket.onopen = () => {
           const recorderOpts = {
             audioBitsPerSecond: 64000,
@@ -2670,20 +2763,24 @@
           try {
             mediaRecorder = new MediaRecorder(audioStream, recorderOpts);
           } catch (e) {
-            console.error('MediaRecorder init failed, trying without mimeType', e);
-            mediaRecorder = new MediaRecorder(audioStream, { audioBitsPerSecond: 64000 });
+            console.error(
+              "MediaRecorder init failed, trying without mimeType",
+              e,
+            );
+            mediaRecorder = new MediaRecorder(audioStream, {
+              audioBitsPerSecond: 64000,
+            });
           }
           mediaRecorder.addEventListener("dataavailable", (e) => {
             if (e.data.size > 0 && dgSocket.readyState === WebSocket.OPEN)
               dgSocket.send(e.data);
           });
           mediaRecorder.addEventListener("error", (e) => {
-            console.error('MediaRecorder error', e);
+            console.error("MediaRecorder error", e);
             stopListening();
           });
           mediaRecorder.start(250);
         };
-
         dgSocket.onmessage = (message) => {
           const data = JSON.parse(message.data);
           const alt =
@@ -2695,7 +2792,6 @@
           const textEl = document.getElementById("transcriptText");
           textEl.innerHTML =
             transcript + '<span class="transcript-caret"></span>';
-
           if (data.is_final) {
             const refs = detectReferences(transcript);
             refs.forEach((r, i) =>
@@ -2726,14 +2822,12 @@
             }
           }
         };
-
         dgSocket.onerror = (err) => {
           console.error("Deepgram error", err);
         };
         dgSocket.onclose = () => {
           console.log("Deepgram connection closed");
         };
-
         listening = true;
         document.getElementById("listenLabel").textContent = "Listening";
         document.getElementById("listenDot").style.animation = "";
@@ -2744,7 +2838,7 @@
         if (mediaRecorder) mediaRecorder.stop();
         if (dgSocket) dgSocket.close();
         if (audioStream) {
-          audioStream.getTracks().forEach(t => t.stop());
+          audioStream.getTracks().forEach((t) => t.stop());
           audioStream = null;
         }
         listening = false;
@@ -2761,6 +2855,7 @@
             alert("Could not start listening: " + err.message);
           });
       });
+
       const searchInput = document.getElementById("searchInput");
       const searchResultsEl = document.getElementById("searchResults");
       let searchTimer = null;
@@ -2797,8 +2892,11 @@
         }, 250);
       });
 
-      // Push live promotes whatever is currently staged to actually live, and
-      // calls the real Electron IPC bridge so the second (output) window updates.
+      // ==========================================
+      // PUSH LIVE — sends the staged verse to the output window
+      // via IPC and updates the split live pane.
+      // ==========================================
+
       document.getElementById("pushLiveBtn").addEventListener("click", () => {
         document
           .querySelectorAll(".vcard")
@@ -2810,7 +2908,11 @@
           );
           if (card) {
             card.classList.add("is-live");
-            card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+            card.scrollIntoView({
+              behavior: "smooth",
+              inline: "center",
+              block: "nearest",
+            });
           }
         }
         setStageState(true);
@@ -2818,8 +2920,7 @@
           document.getElementById("stageVerse").innerHTML;
         document.getElementById("splitLiveCite").textContent =
           document.getElementById("stageCite").textContent;
-        applyBlankMode("none"); // pushing live should un-blank the output, not push behind a black/logo screen
-
+        applyBlankMode("none");
         if (window.scriptureCaster && stagedVerse) {
           window.scriptureCaster.pushLive({
             id: stagedVerse.ref,
@@ -2836,13 +2937,15 @@
         }
       });
 
-      // ---- Background Manager ----
-      let activeBackground = null;
+      // ==========================================
+      // BACKGROUND MANAGER — import/del images/video overlays,
+      // apply them to stage preview and split panes.
+      // ==========================================
 
+      let activeBackground = null;
       function bgUrl(fileName) {
         return "bg://" + fileName;
       }
-
       function applyBackgroundToPreview(src) {
         const containers = [
           document.getElementById("stageBg"),
@@ -2851,7 +2954,6 @@
         ];
         containers.forEach((el) => {
           if (!el) return;
-          // Remove old video children
           el.querySelectorAll("video").forEach((v) => v.remove());
           el.style.backgroundImage = "";
           if (!src) return;
@@ -2864,7 +2966,9 @@
             vid.loop = true;
             vid.playsInline = true;
             vid.autoplay = true;
-            vid.addEventListener("canplay", () => vid.play().catch(() => {}), { once: true });
+            vid.addEventListener("canplay", () => vid.play().catch(() => {}), {
+              once: true,
+            });
             el.appendChild(vid);
           }
         });
@@ -2874,62 +2978,121 @@
         const grid = document.getElementById("bgGrid");
         const items = await window.scriptureCaster.getBackgrounds();
         grid.innerHTML = "";
-
         if (items.length === 0) {
           grid.innerHTML =
-            '<div class="bg-empty" id="bgEmpty">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
-            '<rect x="2" y="4" width="20" height="16" rx="2"/>' +
-            '<circle cx="9" cy="10" r="2"/>' +
-            '<path d="M22 14l-5-5L3 19"/>' +
-            "</svg>No backgrounds yet.<br/>Click '+ Add Background' to import images or videos.</div>";
+            '<div class="bg-empty" id="bgEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M22 14l-5-5L3 19"/></svg>No backgrounds yet.<br/>Click "+ Add Background" to import images or videos.</div>';
           return;
         }
-
         items.forEach((b) => {
           const card = document.createElement("div");
-          card.className = "bg-card" + (activeBackground?.fileName === b.fileName ? " active" : "");
+          card.className =
+            "bg-card" +
+            (activeBackground?.fileName === b.fileName ? " active" : "");
           const media =
             b.type === "video"
-              ? '<video src="' + bgUrl(b.fileName) + '" muted loop playsinline preload="metadata"></video>'
+              ? '<video src="' +
+                bgUrl(b.fileName) +
+                '" muted loop playsinline preload="metadata"></video>'
               : '<img src="' + bgUrl(b.fileName) + '" loading="lazy" />';
           card.innerHTML =
             media +
-            '<span class="bg-card-name">' + b.name + '</span>' +
-            '<button class="bg-card-del" data-id="' + b.id + '">\u00d7</button>';
+            '<span class="bg-card-name">' +
+            b.name +
+            '</span><button class="bg-card-del" data-id="' +
+            b.id +
+            '">\u00d7</button>';
           card.addEventListener("click", (e) => {
             if (e.target.closest(".bg-card-del")) return;
             const src = { type: b.type, fileName: b.fileName };
             activeBackground = src;
             window.scriptureCaster.setBackground(src);
             applyBackgroundToPreview(src);
-            card.closest(".bg-grid").querySelectorAll(".bg-card").forEach((c) => c.classList.remove("active"));
+            card
+              .closest(".bg-grid")
+              .querySelectorAll(".bg-card")
+              .forEach((c) => c.classList.remove("active"));
             card.classList.add("active");
           });
-          card.querySelector(".bg-card-del").addEventListener("click", async (e) => {
-            e.stopPropagation();
-            await window.scriptureCaster.deleteBackground(b.id);
-            if (activeBackground?.fileName === b.fileName) {
-              activeBackground = null;
-              window.scriptureCaster.clearBackground();
-              applyBackgroundToPreview(null);
-            }
-            renderBackgrounds();
-          });
-          // play video on hover
+          card
+            .querySelector(".bg-card-del")
+            .addEventListener("click", async (e) => {
+              e.stopPropagation();
+              await window.scriptureCaster.deleteBackground(b.id);
+              if (activeBackground?.fileName === b.fileName) {
+                activeBackground = null;
+                window.scriptureCaster.clearBackground();
+                applyBackgroundToPreview(null);
+              }
+              renderBackgrounds();
+            });
           const vid = card.querySelector("video");
           if (vid) {
-            card.addEventListener("mouseenter", () => vid.play().catch(() => {}));
-            card.addEventListener("mouseleave", () => { vid.pause(); vid.currentTime = 0; });
+            card.addEventListener("mouseenter", () =>
+              vid.play().catch(() => {}),
+            );
+            card.addEventListener("mouseleave", () => {
+              vid.pause();
+              vid.currentTime = 0;
+            });
           }
           grid.appendChild(card);
         });
       }
 
-      document.getElementById("bgAddBtn").addEventListener("click", async () => {
-        const added = await window.scriptureCaster.importBackgrounds();
-        if (added.length > 0) renderBackgrounds();
-      });
+      document
+        .getElementById("bgAddBtn")
+        .addEventListener("click", async () => {
+          const added = await window.scriptureCaster.importBackgrounds();
+          if (added.length > 0) renderBackgrounds();
+        });
+
+      // ==========================================
+      // TEXT FITTING — shrinks verse font until it fits within its panel.
+      // Each panel (stage, split preview, split live) has its own
+      // start size and minimum floor configured in fitAllStageText().
+      // ==========================================
+
+      function fitTextToContainer(
+        containerId,
+        textId,
+        startFontSize,
+        minFontSize,
+      ) {
+        const container = document.getElementById(containerId);
+        const text = document.getElementById(textId);
+        if (!container || !text) return;
+
+        let fs = startFontSize;
+        text.style.fontSize = fs + "px";
+
+        const maxH = container.clientHeight;
+        if (maxH === 0) return;
+
+        // Target 92% of container height to leave room for citation
+        const targetH = maxH * 0.92;
+
+        // Force synchronous reflow for accurate measurements
+        void text.offsetHeight;
+
+        while (text.scrollHeight > targetH && fs > minFontSize) {
+          fs -= 1;
+          text.style.fontSize = fs + "px";
+          // Force reflow inside loop
+          void text.offsetHeight;
+        }
+      }
+
+      function fitAllStageText() {
+        requestAnimationFrame(() => {
+          // (Container ID, Text ID, Start Size, Min Size)
+          fitTextToContainer("stageBody", "stageVerse", 42, 16);
+          fitTextToContainer("splitPreviewBody", "splitPreviewVerse", 28, 12);
+          fitTextToContainer("splitLiveBody", "splitLiveVerse", 28, 12);
+        });
+      }
+
+      // Refit when window resizes
+      window.addEventListener("resize", fitAllStageText);
     </script>
   </body>
 </html>

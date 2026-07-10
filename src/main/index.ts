@@ -1,5 +1,13 @@
 import {
-  app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog, protocol, net, powerSaveBlocker,
+  app,
+  BrowserWindow,
+  ipcMain,
+  screen,
+  desktopCapturer,
+  dialog,
+  protocol,
+  net,
+  powerSaveBlocker,
 } from "electron";
 import { join, extname, basename } from "path";
 import { pathToFileURL } from "url";
@@ -12,7 +20,13 @@ import {
   type BackgroundItem,
   type BackgroundSource,
 } from "../shared/types";
-import { getChapter, smartSearch, phraseSearch, paraphraseSearch, getBookList } from "../lib/bible";
+import {
+  getChapter,
+  smartSearch,
+  phraseSearch,
+  paraphraseSearch,
+  getBookList,
+} from "../lib/bible";
 
 let operatorWindow: BrowserWindow | null = null;
 let outputWindow: BrowserWindow | null = null;
@@ -48,24 +62,27 @@ function createOperatorWindow() {
   }
 }
 
+let outputDisplayId: number | null = null; // Keep track of which monitor we are on
+
 function createOutputWindow() {
   const displays = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
   const target =
-    displays.length > 1
-      ? displays.find((d) => d.id !== screen.getPrimaryDisplay().id)!
-      : displays[0];
+    displays.length > 1 ? displays.find((d) => d.id !== primary.id)! : primary;
 
   outputWindow = new BrowserWindow({
     x: target.bounds.x,
     y: target.bounds.y,
     width: target.bounds.width,
     height: target.bounds.height,
-    frame: false,
-    kiosk: true,
+    frame: false, // NO title bar
+    fullscreen: true, // FORCE fullscreen
     skipTaskbar: true,
     resizable: false,
+    focusable: true, // Keep true so you can Alt-F4 if needed
+    alwaysOnTop: true,
     title: "Scripture Caster — Live Output",
-    backgroundColor: "#0c0a08",
+    backgroundColor: "#0a0b0f",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -73,9 +90,18 @@ function createOutputWindow() {
     },
   });
 
-  // Hide cursor over the output
+  // Lock dimensions
+  outputWindow.setMaximumSize(target.bounds.width, target.bounds.height);
+  outputWindow.setMinimumSize(target.bounds.width, target.bounds.height);
+
+  // Hide cursor
   outputWindow.webContents.on("did-finish-load", () => {
-    outputWindow?.webContents.insertCSS("html, body { cursor: none !important; }");
+    outputWindow?.webContents.insertCSS(`
+      html, body { 
+        cursor: none !important; 
+        user-select: none !important;
+      }
+    `);
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -86,10 +112,13 @@ function createOutputWindow() {
     outputWindow.loadFile(join(__dirname, "../renderer/output/index.html"));
   }
 }
-
 // ---- Background helpers ----
 async function ensureBackgroundsDir() {
-  try { await fs.mkdir(backgroundsDir, { recursive: true }); } catch { /* ok */ }
+  try {
+    await fs.mkdir(backgroundsDir, { recursive: true });
+  } catch {
+    /* ok */
+  }
 }
 
 async function readMeta(): Promise<BackgroundItem[]> {
@@ -113,13 +142,23 @@ async function importFiles(srcPaths: string[]): Promise<BackgroundItem[]> {
   for (const src of srcPaths) {
     const ext = extname(src).toLowerCase();
     const type = [".mp4", ".mov", ".webm"].includes(ext) ? "video" : "image";
-    if (type === "image" && ![".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(ext)) continue;
+    if (
+      type === "image" &&
+      ![".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(ext)
+    )
+      continue;
 
     const id = `bg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const destName = `${id}${ext}`;
     await fs.copyFile(src, join(backgroundsDir, destName));
 
-    added.push({ id, name: basename(src), type, fileName: destName, addedAt: Date.now() });
+    added.push({
+      id,
+      name: basename(src),
+      type,
+      fileName: destName,
+      addedAt: Date.now(),
+    });
   }
 
   const updated = [...meta, ...added];
@@ -141,6 +180,36 @@ app.whenReady().then(async () => {
 
   createOperatorWindow();
   createOutputWindow();
+
+  // --- PROJECTOR MANAGEMENT ---
+  // If the projector is unplugged, hide the output window so it doesn't float on the main screen
+  screen.on("display-removed", (_event, oldDisplay) => {
+    if (outputWindow && oldDisplay.id === outputDisplayId) {
+      outputWindow.hide();
+      // Optional: Send an IPC to your operator console to show a "Projector disconnected" warning
+      // operatorWindow?.webContents.send("projector-disconnected");
+    }
+  });
+
+  // If the projector is plugged back in, restore the output window to it
+  screen.on("display-added", (_event, newDisplay) => {
+    if (
+      outputWindow &&
+      !outputWindow.isVisible() &&
+      newDisplay.id === outputDisplayId
+    ) {
+      outputWindow.setBounds(newDisplay.bounds);
+      outputWindow.setMaximumSize(
+        newDisplay.bounds.width,
+        newDisplay.bounds.height,
+      );
+      outputWindow.setMinimumSize(
+        newDisplay.bounds.width,
+        newDisplay.bounds.height,
+      );
+      outputWindow.show();
+    }
+  });
 
   // ---- Verse / blank IPC (unchanged) ----
   ipcMain.on(IPC.VERSE_PUSH_LIVE, (_event, verse: VerseMatch) => {
@@ -182,7 +251,16 @@ app.whenReady().then(async () => {
       filters: [
         {
           name: "Images & Videos",
-          extensions: ["jpg", "jpeg", "png", "gif", "webp", "mp4", "mov", "webm"],
+          extensions: [
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "mp4",
+            "mov",
+            "webm",
+          ],
         },
       ],
     });
@@ -196,7 +274,11 @@ app.whenReady().then(async () => {
     if (idx === -1) return;
     const [item] = meta.splice(idx, 1);
     await writeMeta(meta);
-    try { await fs.unlink(join(backgroundsDir, item.fileName)); } catch { /* ok */ }
+    try {
+      await fs.unlink(join(backgroundsDir, item.fileName));
+    } catch {
+      /* ok */
+    }
 
     if (outputState.background?.fileName === item.fileName) {
       outputState.background = null;
@@ -223,16 +305,13 @@ app.whenReady().then(async () => {
     return getBookList();
   });
 
-  ipcMain.handle(
-    IPC.BIBLE_PARAPHRASE_SEARCH,
-    (_event, query: string) => {
-      return paraphraseSearch(query);
-    },
-  );
+  ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, (_event, query: string) => {
+    return paraphraseSearch(query);
+  });
 
   ipcMain.handle(IPC.GET_DESKTOP_AUDIO_SOURCE, async () => {
     const sources = await desktopCapturer.getSources({
-      types: ['screen'],
+      types: ["screen"],
       thumbnailSize: { width: 0, height: 0 },
     });
     if (sources.length === 0) return null;
