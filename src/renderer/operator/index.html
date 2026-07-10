@@ -1842,6 +1842,33 @@
     </div>
 
     <script>
+      let stageRefWidth = null;
+
+      function computeStageFontSize() {
+        const vw = window.innerWidth;
+        return Math.min(27, Math.max(17, vw * 0.02));
+      }
+
+      function updateSplitFontSize() {
+        const isSplit = document.getElementById("app").classList.contains("split-mode");
+        if (!isSplit) {
+          document.querySelectorAll(".split-verse").forEach((el) => el.style.fontSize = "");
+          return;
+        }
+        const wrap = document.getElementById("stageWrap");
+        const wrapW = wrap.offsetWidth;
+        if (!stageRefWidth) stageRefWidth = wrapW;
+        const pane = document.querySelector(".split-pane");
+        if (!pane) return;
+        const paneW = pane.offsetWidth;
+        const ratio = paneW / stageRefWidth;
+        const stageFs = computeStageFontSize();
+        const paneFs = Math.round(stageFs * ratio);
+        document.querySelectorAll(".split-verse").forEach((el) => {
+          el.style.fontSize = paneFs + "px";
+        });
+      }
+
       document
         .getElementById("outputModeToggle")
         .addEventListener("click", (e) => {
@@ -1851,10 +1878,22 @@
             .querySelectorAll("#outputModeToggle button")
             .forEach((b) => b.classList.remove("on"));
           btn.classList.add("on");
+          const willBeSplit = btn.dataset.mode === "split";
+
+          if (willBeSplit) {
+            const stage = document.getElementById("stage");
+            stageRefWidth = stage.offsetWidth;
+          }
+
           document
             .getElementById("app")
-            .classList.toggle("split-mode", btn.dataset.mode === "split");
+            .classList.toggle("split-mode", willBeSplit);
+
+          requestAnimationFrame(() => updateSplitFontSize());
         });
+
+      const resizeObs = new ResizeObserver(() => updateSplitFontSize());
+      resizeObs.observe(document.getElementById("stageWrap"));
 
       const lbc = {
         logo: document.getElementById("logoBtn"),
