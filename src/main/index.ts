@@ -224,6 +224,15 @@ app.whenReady().then(async () => {
     outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
   });
 
+  ipcMain.on(IPC.OUTPUT_TOGGLE_VISIBILITY, () => {
+    if (!outputWindow) return;
+    if (outputWindow.isVisible()) {
+      outputWindow.hide();
+    } else {
+      outputWindow.show();
+    }
+  });
+
   ipcMain.on(IPC.SET_BLANK_MODE, (_event, mode: BlankMode) => {
     outputState.blankMode = mode;
     outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);

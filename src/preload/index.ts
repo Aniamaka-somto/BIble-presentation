@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('scriptureCaster', {
   getBookList: () => ipcRenderer.invoke(IPC.BIBLE_GET_BOOKS),
   paraphraseSearch: (query: string) => ipcRenderer.invoke(IPC.BIBLE_PARAPHRASE_SEARCH, query),
   getDesktopAudioSource: () => ipcRenderer.invoke(IPC.GET_DESKTOP_AUDIO_SOURCE) as Promise<DesktopSource | null>,
+  toggleOutputVisibility: () => ipcRenderer.send(IPC.OUTPUT_TOGGLE_VISIBILITY),
   onOutputStateChanged: (callback: (state: OutputState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: OutputState) => callback(state)
     ipcRenderer.on(IPC.OUTPUT_STATE_CHANGED, listener)

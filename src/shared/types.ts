@@ -61,4 +61,5 @@ export const IPC = {
   BACKGROUNDS_LIST: 'backgrounds:list',
   BACKGROUNDS_IMPORT: 'backgrounds:import',
   BACKGROUNDS_DELETE: 'backgrounds:delete',
+  OUTPUT_TOGGLE_VISIBILITY: 'output:toggle-visibility',
 } as const

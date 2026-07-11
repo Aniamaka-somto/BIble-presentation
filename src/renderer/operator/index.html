@@ -1931,7 +1931,9 @@
           lbc.black.classList.contains("active") ? "none" : "black",
         ),
       );
-      lbc.clear.addEventListener("click", () => applyBlankMode("none"));
+      lbc.clear.addEventListener("click", () => {
+        if (window.scriptureCaster) window.scriptureCaster.clearLive();
+      });
 
       const liveToggle = document.getElementById("liveToggle");
       liveToggle.addEventListener("click", () => {
@@ -1939,6 +1941,9 @@
         document.getElementById("liveLabel").textContent = isOff
           ? "OFF AIR"
           : "ON AIR";
+        if (window.scriptureCaster) {
+          window.scriptureCaster.toggleOutputVisibility();
+        }
       });
 
       const alertsOverlay = document.getElementById("alertsOverlay");
