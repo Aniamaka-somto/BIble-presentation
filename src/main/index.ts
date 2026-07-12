@@ -60,6 +60,13 @@ function createOperatorWindow() {
   } else {
     operatorWindow.loadFile(join(__dirname, "../renderer/operator/index.html"));
   }
+
+  operatorWindow.on("close", () => {
+    if (outputWindow) {
+      outputWindow.destroy();
+      outputWindow = null;
+    }
+  });
 }
 
 let outputDisplayId: number | null = null; // Keep track of which monitor we are on
@@ -233,6 +240,10 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.on(IPC.SEND_ALERT, (_event, message: string) => {
+    outputWindow?.webContents.send(IPC.SEND_ALERT, message);
+  });
+
   ipcMain.on(IPC.SET_BLANK_MODE, (_event, mode: BlankMode) => {
     outputState.blankMode = mode;
     outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
@@ -331,6 +342,8 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createOperatorWindow();
       createOutputWindow();
+    } else {
+      operatorWindow?.show();
     }
   });
 });

@@ -25,9 +25,15 @@ contextBridge.exposeInMainWorld('scriptureCaster', {
   paraphraseSearch: (query: string) => ipcRenderer.invoke(IPC.BIBLE_PARAPHRASE_SEARCH, query),
   getDesktopAudioSource: () => ipcRenderer.invoke(IPC.GET_DESKTOP_AUDIO_SOURCE) as Promise<DesktopSource | null>,
   toggleOutputVisibility: () => ipcRenderer.send(IPC.OUTPUT_TOGGLE_VISIBILITY),
+  sendAlert: (message: string) => ipcRenderer.send(IPC.SEND_ALERT, message),
   onOutputStateChanged: (callback: (state: OutputState) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: OutputState) => callback(state)
     ipcRenderer.on(IPC.OUTPUT_STATE_CHANGED, listener)
     return () => ipcRenderer.removeListener(IPC.OUTPUT_STATE_CHANGED, listener)
+  },
+  onAlert: (callback: (message: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, message: string) => callback(message)
+    ipcRenderer.on(IPC.SEND_ALERT, listener)
+    return () => ipcRenderer.removeListener(IPC.SEND_ALERT, listener)
   }
 })

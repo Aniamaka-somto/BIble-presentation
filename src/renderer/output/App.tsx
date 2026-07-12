@@ -11,6 +11,7 @@ declare global {
   interface Window {
     scriptureCaster: {
       onOutputStateChanged: (cb: (state: OutputState) => void) => () => void;
+      onAlert: (cb: (message: string) => void) => () => void;
     };
   }
 }
@@ -194,8 +195,16 @@ export default function App() {
     blankMode: "none",
     background: null,
   });
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
   useEffect(() => window.scriptureCaster.onOutputStateChanged(setState), []);
+  useEffect(() => {
+    const unsub = window.scriptureCaster.onAlert((msg) => {
+      setAlertMsg(msg);
+      setTimeout(() => setAlertMsg(null), 6000);
+    });
+    return unsub;
+  }, []);
 
   const base: CSSProperties = {
     width: "100vw",
@@ -248,6 +257,9 @@ export default function App() {
             />
           </div>
         )}
+        {alertMsg && (
+          <div style={alertBarStyle}>{alertMsg}</div>
+        )}
       </div>
     );
   }
@@ -262,6 +274,24 @@ export default function App() {
   return (
     <div style={{ ...base, background: "#0a0b0f", color: "#f1f2f7" }}>
       <VerseDisplay verse={state.verse} />
+      {alertMsg && (
+        <div style={alertBarStyle}>{alertMsg}</div>
+      )}
     </div>
   );
 }
+
+const alertBarStyle: CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 100,
+  background: "#e74c3c",
+  color: "#fff",
+  padding: "14px 20px",
+  fontSize: "18px",
+  fontWeight: 600,
+  textAlign: "center",
+  fontFamily: "'Inter', sans-serif",
+};

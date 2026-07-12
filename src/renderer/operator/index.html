@@ -384,6 +384,10 @@
         gap: 3px;
         padding: 11px 10px 0;
         flex-shrink: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        white-space: nowrap;
       }
       .lib-tab {
         font-size: 12px;
@@ -394,6 +398,7 @@
         cursor: pointer;
         white-space: nowrap;
         border-bottom: 2px solid transparent;
+        flex-shrink: 0;
       }
       .lib-tab.primary {
         font-weight: 700;
@@ -405,33 +410,6 @@
         color: var(--blue-2);
         border-bottom-color: var(--blue);
         background: var(--bg-1);
-      }
-      .lib-tab.on.alt-on {
-        color: var(--gold);
-        border-bottom-color: var(--gold);
-      }
-      .lib-more {
-        margin-left: auto;
-        font-size: 11px;
-        color: var(--text-lo);
-        padding: 8px 4px;
-        cursor: pointer;
-      }
-      .lib-more:hover {
-        color: var(--text-mid);
-      }
-      .lib-overflow {
-        display: none;
-        flex-direction: column;
-        gap: 2px;
-        padding: 4px 10px 8px;
-      }
-      .lib-overflow.show {
-        display: flex;
-      }
-      .lib-overflow .lib-tab {
-        border-radius: 8px;
-        border-bottom: none;
       }
 
       .lib-search {
@@ -942,6 +920,7 @@
         display: flex;
         align-items: center;
         gap: 7px;
+        transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
       }
       .btn-ghost {
         background: var(--bg-3);
@@ -1092,6 +1071,15 @@
         50%,
         100% {
           opacity: 0;
+        }
+      }
+      @keyframes pulsered {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(255, 84, 112, 0.6);
+        }
+        50% {
+          box-shadow: 0 0 0 6px rgba(255, 84, 112, 0);
         }
       }
 
@@ -1489,9 +1477,6 @@
           <div class="lib-tabs">
             <div class="lib-tab primary on" data-tab="scripture">Scripture</div>
             <div class="lib-tab" data-tab="songs">Songs</div>
-            <div class="lib-more" id="libMoreBtn">More</div>
-          </div>
-          <div class="lib-overflow" id="libOverflow">
             <div class="lib-tab" data-tab="media">Media</div>
             <div class="lib-tab" data-tab="web">Web</div>
             <div class="lib-tab" data-tab="themes">Backgrounds</div>
@@ -1850,6 +1835,7 @@
           <div class="btn btn-ghost" id="alertsCancel">Cancel</div>
           <div
             class="btn"
+            id="alertsSend"
             style="background: var(--blue); color: #fff; border: none"
           >
             Send alert
@@ -1933,6 +1919,7 @@
       );
       lbc.clear.addEventListener("click", () => {
         if (window.scriptureCaster) window.scriptureCaster.clearLive();
+        lbc.clear.classList.toggle("active");
       });
 
       const liveToggle = document.getElementById("liveToggle");
@@ -1955,23 +1942,25 @@
         .addEventListener("click", () =>
           alertsOverlay.classList.remove("show"),
         );
+      document.getElementById("alertsSend").addEventListener("click", () => {
+        const txt = document.querySelector(".alerts-modal textarea").value.trim();
+        if (!txt) return;
+        if (window.scriptureCaster) {
+          window.scriptureCaster.sendAlert(txt);
+        }
+        document.querySelector(".alerts-modal textarea").value = "";
+        alertsOverlay.classList.remove("show");
+      });
       alertsOverlay.addEventListener("click", (e) => {
         if (e.target === alertsOverlay) alertsOverlay.classList.remove("show");
       });
-
-      document
-        .getElementById("libMoreBtn")
-        .addEventListener("click", () =>
-          document.getElementById("libOverflow").classList.toggle("show"),
-        );
 
       document.querySelectorAll(".lib-tab").forEach((tab) => {
         tab.addEventListener("click", () => {
           document
             .querySelectorAll(".lib-tab")
-            .forEach((t) => t.classList.remove("on", "alt-on"));
+            .forEach((t) => t.classList.remove("on"));
           tab.classList.add("on");
-          if (tab.dataset.tab === "themes") tab.classList.add("alt-on");
 
           const isBg = tab.dataset.tab === "themes";
           document.querySelector(".lib-search")?.classList.toggle("hide", isBg);
@@ -1988,6 +1977,31 @@
             .forEach((i) => i.classList.remove("active"));
           item.classList.add("active");
         });
+      });
+
+      const scheduleTitle = document.querySelector(
+        ".panel-head .panel-title",
+      );
+      let scheduleRenamed = false;
+
+      document.querySelector(".panel-head .add-btn").addEventListener("click", () => {
+        if (!stagedVerse) return;
+        if (!scheduleRenamed) {
+          scheduleTitle.textContent = "Schedule";
+          scheduleRenamed = true;
+        }
+        const list = document.querySelector(".schedule-list");
+        const item = document.createElement("div");
+        item.className = "sched-item";
+        item.innerHTML =
+          '<div class="sched-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V4a2 2 0 00-2-2h-11.5A2.5 2.5 0 004 4.5v15Z" stroke="currentColor" stroke-width="1.6"/></svg></div><div class="sched-body"><div class="sched-name">' +
+          stagedVerse.ref +
+          '</div><div class="sched-sub">Scripture</div></div>';
+        item.addEventListener("click", () => {
+          document.querySelectorAll(".sched-item").forEach((i) => i.classList.remove("active"));
+          item.classList.add("active");
+        });
+        list.insertBefore(item, list.firstChild);
       });
 
       let verseData = {};
@@ -2230,6 +2244,7 @@
       }
 
       let _sup = false;
+      let _deleting = false;
 
       function setInput(v) {
         _sup = true;
@@ -2293,6 +2308,7 @@
               setInput(searchBookName);
               return;
             }
+            _deleting = true;
           }
         });
 
@@ -2304,14 +2320,28 @@
           const cursor = this.selectionStart;
 
           if (searchPhase === "book") {
-            const letters = val.replace(/[^a-zA-Z\s]/g, "").trim();
+            const letters = val.replace(/[^a-zA-Z0-9\s]/g, "").trim();
             if (!letters) {
               searchBookName = "";
               return;
             }
             const book = findBook(letters);
-            if (!book) return;
+            if (!book) {
+              // Reject character — revert to last valid state with highlight
+              const prev = searchBookName || "";
+              setInput(prev);
+              if (prev && letters.length > 1) {
+                const pc = Math.min(letters.length - 1, prev.length);
+                this.setSelectionRange(pc, prev.length);
+              }
+              return;
+            }
             searchBookName = book.name;
+            if (_deleting) {
+              _deleting = false;
+              // User is backspacing — don't re-complete
+              return;
+            }
             const completed = book.name.slice(letters.length);
             if (completed) {
               setInput(book.name);
@@ -2702,6 +2732,9 @@
       let mediaRecorder = null;
       let audioStream = null;
       let listening = false;
+      let dgReconnectAttempts = 0;
+      const DG_MAX_RECONNECT = 10;
+      let dgReconnectTimer = null;
 
       function getDeepgramKey() {
         return new Promise((resolve) => {
@@ -2752,6 +2785,14 @@
       async function startListening() {
         const key = await getDeepgramKey();
         if (!key) return;
+        if (!navigator.onLine) {
+          document.getElementById("listenLabel").textContent = "Offline";
+          document.getElementById("listenDot").style.background = "var(--text-lo)";
+          return;
+        }
+        document.getElementById("listenLabel").textContent = "Initializing…";
+        document.getElementById("listenDot").style.background = "var(--gold)";
+        document.getElementById("listenDot").style.animation = "none";
         audioStream = await navigator.mediaDevices.getUserMedia({
           audio: AUDIO_CONSTRAINTS,
         });
@@ -2832,14 +2873,44 @@
         };
         dgSocket.onclose = () => {
           console.log("Deepgram connection closed");
+          scheduleReconnect();
         };
         listening = true;
+        dgReconnectAttempts = 0;
         document.getElementById("listenLabel").textContent = "Listening";
         document.getElementById("listenDot").style.animation = "";
         document.getElementById("listenDot").style.background = "";
       }
 
+      function scheduleReconnect() {
+        if (!listening) return;
+        if (!navigator.onLine) {
+          document.getElementById("listenLabel").textContent = "Offline";
+          document.getElementById("listenDot").style.background = "var(--text-lo)";
+          document.getElementById("listenDot").style.animation = "none";
+          return;
+        }
+        if (dgReconnectAttempts >= DG_MAX_RECONNECT) {
+          console.error("Deepgram max reconnection attempts reached");
+          stopListening();
+          return;
+        }
+        dgReconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, dgReconnectAttempts - 1), 30000);
+        document.getElementById("listenLabel").textContent =
+          "Reconnecting (" + dgReconnectAttempts + "/" + DG_MAX_RECONNECT + ")";
+        document.getElementById("listenDot").style.background = "var(--gold)";
+        dgReconnectTimer = setTimeout(() => {
+          startListening().catch(() => {});
+        }, delay);
+      }
+
       function stopListening() {
+        if (dgReconnectTimer) {
+          clearTimeout(dgReconnectTimer);
+          dgReconnectTimer = null;
+        }
+        dgReconnectAttempts = 0;
         if (mediaRecorder) mediaRecorder.stop();
         if (dgSocket) dgSocket.close();
         if (audioStream) {
@@ -2861,6 +2932,24 @@
           });
       });
 
+      window.addEventListener("offline", () => {
+        if (!listening) return;
+        document.getElementById("listenLabel").textContent = "Offline";
+        document.getElementById("listenDot").style.background = "var(--text-lo)";
+        document.getElementById("listenDot").style.animation = "none";
+      });
+      window.addEventListener("online", () => {
+        if (!listening) return;
+        if (dgSocket && dgSocket.readyState !== WebSocket.CLOSED) return;
+        if (dgReconnectTimer) {
+          clearTimeout(dgReconnectTimer);
+          dgReconnectTimer = null;
+        }
+        document.getElementById("listenLabel").textContent = "Reconnecting…";
+        document.getElementById("listenDot").style.background = "var(--gold)";
+        startListening().catch(() => {});
+      });
+
       const searchInput = document.getElementById("searchInput");
       const searchResultsEl = document.getElementById("searchResults");
       let searchTimer = null;
@@ -2874,6 +2963,18 @@
         searchTimer = setTimeout(async () => {
           const results = await window.scriptureCaster.searchVerses(q);
           searchResultsEl.innerHTML = "";
+          if (results.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "card";
+            empty.style.marginBottom = "8px";
+            empty.style.color = "var(--text-lo)";
+            empty.style.fontSize = "13px";
+            empty.style.padding = "12px";
+            empty.style.textAlign = "center";
+            empty.textContent = "No verses found for \u201c" + q + "\u201d";
+            searchResultsEl.appendChild(empty);
+            return;
+          }
           results.slice(0, 8).forEach((r) => {
             const row = document.createElement("div");
             row.className = "card";
