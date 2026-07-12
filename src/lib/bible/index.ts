@@ -1,3 +1,5 @@
+import path from "path";
+import fs from "fs";
 import kjv from "./kjv.json";
 
 export interface BibleVerse {
@@ -11,37 +13,111 @@ export interface ParaphraseMatch extends BibleVerse {
   score: number;
 }
 
-const ALL_VERSES = kjv as BibleVerse[];
-
-// Index by "Book Chapter" for fast chapter lookups (what the filmstrip needs)
-const chapterIndex = new Map<string, BibleVerse[]>();
-for (const v of ALL_VERSES) {
-  const key = `${v.book} ${v.chapter}`;
-  if (!chapterIndex.has(key)) chapterIndex.set(key, []);
-  chapterIndex.get(key)!.push(v);
+export interface BookInfo {
+  name: string;
+  chapters: number;
 }
 
-export function getChapter(book: string, chapter: number): BibleVerse[] {
-  return chapterIndex.get(`${book} ${chapter}`) ?? [];
+export interface TranslationInfo {
+  id: string;
+  name: string;
+}
+
+interface TranslationData {
+  verses: BibleVerse[];
+  chapterIndex: Map<string, BibleVerse[]>;
+  bookList: BookInfo[];
+}
+
+const cache = new Map<string, TranslationData>();
+let translationsDir = "";
+
+export function setTranslationsDir(dir: string) {
+  translationsDir = dir;
+}
+
+function translationsPath(): string {
+  if (!translationsDir) {
+    translationsDir = path.join(
+      process.env.APPDATA ||
+        process.env.XDG_CONFIG_HOME ||
+        path.join(process.env.HOME || "/tmp", ".config"),
+      "scripture-caster",
+      "translations",
+    );
+  }
+  return translationsDir;
+}
+
+function buildData(verses: BibleVerse[]): TranslationData {
+  const chapterIndex = new Map<string, BibleVerse[]>();
+  for (const v of verses) {
+    const key = `${v.book} ${v.chapter}`;
+    if (!chapterIndex.has(key)) chapterIndex.set(key, []);
+    chapterIndex.get(key)!.push(v);
+  }
+  const seen = new Map<string, number>();
+  for (const v of verses) {
+    const cur = seen.get(v.book) ?? 0;
+    if (v.chapter > cur) seen.set(v.book, v.chapter);
+  }
+  const bookList: BookInfo[] = [];
+  const done = new Set<string>();
+  for (const v of verses) {
+    if (!done.has(v.book)) {
+      bookList.push({ name: v.book, chapters: seen.get(v.book)! });
+      done.add(v.book);
+    }
+  }
+  return { verses, chapterIndex, bookList };
+}
+
+function getTranslation(name: string): TranslationData {
+  let data = cache.get(name);
+  if (data) return data;
+  if (name === "KJV") {
+    data = buildData(kjv as BibleVerse[]);
+    cache.set("KJV", data);
+    return data;
+  }
+  const filePath = path.join(translationsPath(), `${name}.json`);
+  if (!fs.existsSync(filePath)) {
+    return cache.get("KJV")!;
+  }
+  const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as BibleVerse[];
+  data = buildData(raw);
+  cache.set(name, data);
+  return data;
+}
+
+export function getChapter(
+  book: string,
+  chapter: number,
+  translation = "KJV",
+): BibleVerse[] {
+  return getTranslation(translation).chapterIndex.get(`${book} ${chapter}`) ?? [];
 }
 
 export function getVerse(
   book: string,
   chapter: number,
   verse: number,
+  translation = "KJV",
 ): BibleVerse | undefined {
-  return getChapter(book, chapter).find((v) => v.verse === verse);
+  return getChapter(book, chapter, translation).find((v) => v.verse === verse);
 }
 
-// Simple "Book chapter:verse" or "Book chapter:verse-verse" parser, e.g. "Luke 1:17"
-export function lookupReference(ref: string): BibleVerse[] {
+export function lookupReference(
+  ref: string,
+  translation = "KJV",
+): BibleVerse[] {
   const match = ref.trim().match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/);
   if (!match) return [];
   const [, book, chapterStr, startStr, endStr] = match;
   const chapter = parseInt(chapterStr, 10);
   const start = parseInt(startStr, 10);
   const end = endStr ? parseInt(endStr, 10) : start;
-  return getChapter(book.trim(), chapter).filter(
+  return getChapter(book.trim(), chapter, translation).filter(
     (v) => v.verse >= start && v.verse <= end,
   );
 }
@@ -63,7 +139,7 @@ const STOP_WORDS = new Set([
   'wilt','canst','couldst','wouldst','shouldst','mightst','mayest',
 ]);
 
-const STEM_SUFFIXES = [
+const STEM_SUFFIXES: [string, string][] = [
   ['eth', 'e'],
   ['est', 'e'],
   ['ing', 'e'],
@@ -89,22 +165,19 @@ function tokenize(text: string): string[] {
     .map(stem);
 }
 
-// Word-overlap scoring for paraphrase detection, with order & proximity awareness.
-// First tries an exact normalized-phrase match — if the transcript's words appear as a
-// contiguous substring in a verse (ignoring punctuation), that's a guaranteed hit at 1.0.
-// Falls through to token-level overlap + order/proximity scoring for looser matches.
 export function paraphraseSearch(
   query: string,
   limit = 5,
   threshold = 0.4,
+  translation = "KJV",
 ): ParaphraseMatch[] {
-  // ---- Pre-pass: punctuation-agnostic exact phrase match ----
+  const { verses } = getTranslation(translation);
   const norm = (s: string) =>
     s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
   const normQuery = norm(query);
   if (normQuery.length >= 3) {
     const exact: ParaphraseMatch[] = [];
-    for (const v of ALL_VERSES) {
+    for (const v of verses) {
       if (norm(v.text).includes(normQuery)) {
         exact.push({ ...v, score: 1 });
         if (exact.length >= limit) break;
@@ -113,15 +186,13 @@ export function paraphraseSearch(
     if (exact.length > 0) return exact;
   }
 
-  // ---- Word-overlap pass (for paraphrases, not exact quotes) ----
   const queryWords = tokenize(query);
   if (queryWords.length < 3) return [];
 
   const minMatches = Math.ceil(queryWords.length * 0.4);
-  const maxSpan = queryWords.length * 5; // expected span if words are reasonably close
-
+  const maxSpan = queryWords.length * 5;
   const results: ParaphraseMatch[] = [];
-  for (const v of ALL_VERSES) {
+  for (const v of verses) {
     const verseTokenized = tokenize(v.text);
     const verseWords = new Set(verseTokenized);
     let matches = 0;
@@ -129,15 +200,11 @@ export function paraphraseSearch(
     for (const w of queryWords) {
       if (verseWords.has(w)) {
         matches++;
-        // Record position of first occurrence in verse
         matchPositions.push(verseTokenized.indexOf(w));
       }
     }
     if (matches < minMatches) continue;
-
     const rawScore = matches / queryWords.length;
-
-    // --- Order & proximity bonus ---
     let orderBonus = 1;
     let proximityBonus = 1;
     if (matchPositions.length >= 2) {
@@ -149,55 +216,31 @@ export function paraphraseSearch(
         }
       }
       if (!inOrder) orderBonus = 0.7;
-
       const span = Math.max(...matchPositions) - Math.min(...matchPositions);
       proximityBonus = 0.6 + 0.4 * Math.max(0, 1 - span / Math.max(1, maxSpan));
     }
-
     const adjusted = rawScore * orderBonus * proximityBonus;
     const score = Math.round(adjusted * adjusted * 100) / 100;
     if (score >= threshold) {
       results.push({ ...v, score });
     }
   }
-
   return results.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
-// Return canonical book order with chapter counts, derived from the corpus.
-export interface BookInfo {
-  name: string;
-  chapters: number;
+export function getBookList(translation = "KJV"): BookInfo[] {
+  return getTranslation(translation).bookList;
 }
 
-let _bookList: BookInfo[] | null = null;
-
-export function getBookList(): BookInfo[] {
-  if (_bookList) return _bookList;
-  const seen = new Map<string, number>();
-  for (const v of ALL_VERSES) {
-    const cur = seen.get(v.book) ?? 0;
-    if (v.chapter > cur) seen.set(v.book, v.chapter);
-  }
-  // Preserve corpus order (canonical)
-  const ordered: BookInfo[] = [];
-  const done = new Set<string>();
-  for (const v of ALL_VERSES) {
-    if (!done.has(v.book)) {
-      ordered.push({ name: v.book, chapters: seen.get(v.book)! });
-      done.add(v.book);
-    }
-  }
-  _bookList = ordered;
-  return ordered;
-}
-
-// Naive full-text search across the corpus — good enough for the manual
-// search box until this gets replaced by a real pgvector/semantic search.
-export function searchText(query: string, limit = 20): BibleVerse[] {
+export function searchText(
+  query: string,
+  limit = 20,
+  translation = "KJV",
+): BibleVerse[] {
   const q = query.toLowerCase();
+  const { verses } = getTranslation(translation);
   const results: BibleVerse[] = [];
-  for (const v of ALL_VERSES) {
+  for (const v of verses) {
     if (v.text.toLowerCase().includes(q)) {
       results.push(v);
       if (results.length >= limit) break;
@@ -206,15 +249,18 @@ export function searchText(query: string, limit = 20): BibleVerse[] {
   return results;
 }
 
-// Punctuation-agnostic phrase search — strips punctuation from both the
-// query and verse text so "shepherd, I shall" matches "shepherd; I shall".
-export function phraseSearch(query: string, limit = 10): BibleVerse[] {
+export function phraseSearch(
+  query: string,
+  limit = 10,
+  translation = "KJV",
+): BibleVerse[] {
   const norm = (s: string) =>
     s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
   const q = norm(query);
   if (q.length < 3) return [];
+  const { verses } = getTranslation(translation);
   const results: BibleVerse[] = [];
-  for (const v of ALL_VERSES) {
+  for (const v of verses) {
     if (norm(v.text).includes(q)) {
       results.push(v);
       if (results.length >= limit) break;
@@ -223,9 +269,49 @@ export function phraseSearch(query: string, limit = 10): BibleVerse[] {
   return results;
 }
 
-// Tries reference format first ("Mark 1:2"), falls back to phrase/text search.
-export function smartSearch(query: string, limit = 20): BibleVerse[] {
-  const asReference = lookupReference(query);
+export function smartSearch(
+  query: string,
+  limit = 20,
+  translation = "KJV",
+): BibleVerse[] {
+  const asReference = lookupReference(query, translation);
   if (asReference.length > 0) return asReference;
-  return searchText(query, limit);
+  return searchText(query, limit, translation);
+}
+
+export function listTranslations(): TranslationInfo[] {
+  const list: TranslationInfo[] = [{ id: "KJV", name: "KJV" }];
+  const dir = translationsPath();
+  if (!fs.existsSync(dir)) return list;
+  for (const file of fs.readdirSync(dir)) {
+    if (file.endsWith(".json")) {
+      const id = file.slice(0, -5);
+      if (id !== "KJV") {
+        list.push({ id, name: id });
+      }
+    }
+  }
+  return list;
+}
+
+export function importTranslation(id: string, verses: BibleVerse[]): void {
+  const dir = translationsPath();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(
+    path.join(dir, `${id}.json`),
+    JSON.stringify(verses, null, 2),
+    "utf-8",
+  );
+  cache.delete(id);
+}
+
+export function deleteTranslation(id: string): void {
+  if (id === "KJV") return;
+  const filePath = path.join(translationsPath(), `${id}.json`);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+  cache.delete(id);
 }

@@ -450,32 +450,67 @@
         flex-direction: column;
         gap: 3px;
       }
-      .lib-row {
+      .translation-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
-        padding: 9px;
-        border-radius: 8px;
+        padding: 4px 0;
+      }
+      .translation-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.4px;
+        color: var(--text-lo);
+        text-transform: uppercase;
+      }
+      .translation-add {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        font-weight: 600;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        color: var(--text-mid);
         cursor: pointer;
       }
-      .lib-row:hover {
-        background: var(--bg-2);
-      }
-      .lib-row-title {
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-mid);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .lib-row:hover .lib-row-title {
+      .translation-add:hover {
         color: var(--text-hi);
       }
-      .lib-row-sub {
-        font-size: 11px;
+      .translation-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 4px 0;
+      }
+      .translation-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12.5px;
+        padding: 7px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: var(--text-mid);
+      }
+      .translation-list-item:hover {
+        background: var(--bg-2);
+        color: var(--text-hi);
+      }
+      .translation-list-item.on {
+        color: var(--blue-2);
+        background: var(--bg-3);
+      }
+      .translation-list-item .del {
+        font-size: 13px;
         color: var(--text-lo);
+        padding: 0 4px;
+      }
+      .translation-list-item .del:hover {
+        color: var(--live-red);
       }
 
       /* ============ BACKGROUND MANAGER ============ */
@@ -1200,6 +1235,12 @@
         color: var(--gold);
         border: 1px solid rgba(220, 184, 126, 0.35);
       }
+      .tag.translation-tag {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-dim);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-left: 8px;
+      }
       .card-snip {
         font-family: "Fraunces", serif;
         font-size: 13px;
@@ -1504,30 +1545,11 @@
             />
           </div>
           <div class="lib-list" id="libList">
-            <div class="lib-row" data-book="Luke" data-chapter="1">
-              <div>
-                <div class="lib-row-title">Luke 1</div>
-                <div class="lib-row-sub">80 verses</div>
-              </div>
+            <div class="translation-header">
+              <span class="translation-label">Translation</span>
+              <div class="translation-add" id="translationAddBtn" title="Import translation">+</div>
             </div>
-            <div class="lib-row" data-book="Romans" data-chapter="8">
-              <div>
-                <div class="lib-row-title">Romans 8</div>
-                <div class="lib-row-sub">39 verses</div>
-              </div>
-            </div>
-            <div class="lib-row" data-book="Psalms" data-chapter="23">
-              <div>
-                <div class="lib-row-title">Psalm 23</div>
-                <div class="lib-row-sub">6 verses</div>
-              </div>
-            </div>
-            <div class="lib-row" data-book="Hebrews" data-chapter="11">
-              <div>
-                <div class="lib-row-title">Hebrews 11</div>
-                <div class="lib-row-sub">40 verses</div>
-              </div>
-            </div>
+            <div class="translation-list" id="translationList"></div>
           </div>
           <!-- Background Manager panel -->
           <div class="bg-manager" id="bgManager">
@@ -1566,7 +1588,7 @@
               </div>
               <div class="stage-ref-row">
                 <span class="stage-ref" id="stageRef">LUKE 1:17</span>
-                <span class="kjv-tag">KJV</span>
+                <span class="kjv-tag" id="translationTag">KJV</span>
               </div>
             </div>
             <div class="stage-body" id="stageBody">
@@ -1577,7 +1599,7 @@
                 make ready a people prepared for the Lord.
               </div>
               <div class="stage-cite" id="stageCite">
-                Luke 1:17 · King James Version
+                Luke 1:17 · KJV
               </div>
             </div>
             <div class="stage-foot">
@@ -1955,6 +1977,65 @@
         if (e.target === alertsOverlay) alertsOverlay.classList.remove("show");
       });
 
+      // ---- Translation selector ----
+      const transList = document.getElementById("translationList");
+      const transAddBtn = document.getElementById("translationAddBtn");
+
+      async function loadTranslationList() {
+        const list = await window.scriptureCaster.listTranslations();
+        transList.innerHTML = "";
+        list.forEach((t) => {
+          const item = document.createElement("div");
+          item.className = "translation-list-item" + (t.id === currentTranslation ? " on" : "");
+          const label = document.createElement("span");
+          label.textContent = t.name;
+          item.appendChild(label);
+          if (t.id !== "KJV") {
+            const del = document.createElement("span");
+            del.className = "del";
+            del.textContent = "\u2715";
+            del.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              await window.scriptureCaster.deleteTranslation(t.id);
+              if (currentTranslation === t.id) {
+                switchTranslation("KJV");
+              }
+              loadTranslationList();
+            });
+            item.appendChild(del);
+          }
+          item.addEventListener("click", () => switchTranslation(t.id));
+          transList.appendChild(item);
+        });
+      }
+
+      function syncTranslationUI(id) {
+        searchBooks = [];
+        document.querySelectorAll(".translation-list-item").forEach((i) => {
+          const label = i.querySelector("span:first-child");
+          i.classList.toggle("on", label && label.textContent === id);
+        });
+      }
+
+      function switchTranslation(id) {
+        currentTranslation = id;
+        syncTranslationUI(id);
+        if (stagedVerse) {
+          loadAndStage(stagedVerse.book, stagedVerse.chapter, stagedVerse.n);
+        } else {
+          loadChapter("Luke", 1, 17, id);
+        }
+      }
+
+      loadTranslationList();
+
+      transAddBtn.addEventListener("click", async () => {
+        const result = await window.scriptureCaster.importTranslation();
+        if (result) {
+          loadTranslationList();
+        }
+      });
+
       document.querySelectorAll(".lib-tab").forEach((tab) => {
         tab.addEventListener("click", () => {
           document
@@ -2006,6 +2087,7 @@
 
       let verseData = {};
       let stagedVerse = null;
+      let currentTranslation = "KJV";
       const stateTag = document.getElementById("stateTag");
       const filmstripEl = document.getElementById("filmstrip");
 
@@ -2016,17 +2098,18 @@
           : '<span class="state-dot"></span>STAGED — not yet visible';
       }
 
-      function loadVerseIntoStage(v) {
+      function loadVerseIntoStage(v, translation) {
         document.getElementById("stageRef").textContent = v.ref;
         document.getElementById("stageVerse").innerHTML =
           '<span class="num">' + v.n + "</span>" + v.text;
-        document.getElementById("stageCite").innerHTML = v.ref + " \u00b7 KJV";
+        document.getElementById("stageCite").innerHTML = v.ref + " \u00b7 " + translation;
+        document.getElementById("translationTag").textContent = translation;
         document.getElementById("navLabel").textContent =
           "verse " + v.n + " of " + Object.keys(verseData).length;
         document.getElementById("splitPreviewVerse").innerHTML =
           '<span class="num">' + v.n + "</span>" + v.text;
         document.getElementById("splitPreviewCite").textContent =
-          v.ref + " \u00b7 KJV";
+          v.ref + " \u00b7 " + translation;
         fitAllStageText();
       }
 
@@ -2043,7 +2126,8 @@
             .forEach((c) => c.classList.remove("is-staged"));
           const wasLive = card.classList.contains("is-live");
           if (!wasLive) card.classList.add("is-staged");
-          loadVerseIntoStage(v);
+        loadVerseIntoStage(v, currentTranslation);
+        setStageState(false);
           setStageState(wasLive);
         });
       }
@@ -2066,8 +2150,13 @@
         });
       }
 
-      async function loadChapter(book, chapter, startLive) {
-        const verses = await window.scriptureCaster.getChapter(book, chapter);
+      async function loadChapter(book, chapter, startLive, translation) {
+        translation = translation || currentTranslation;
+        if (translation !== currentTranslation) {
+          currentTranslation = translation;
+          syncTranslationUI(translation);
+        }
+        const verses = await window.scriptureCaster.getChapter(book, chapter, translation);
         verseData = {};
         verses.forEach((v) => {
           verseData[v.verse] = {
@@ -2084,14 +2173,14 @@
           verses.length + " verses";
         renderFilmstrip(startLive);
         stagedVerse = verseData[startLive];
-        loadVerseIntoStage(stagedVerse);
+        loadVerseIntoStage(stagedVerse, translation);
         setStageState(true);
       }
 
-      loadChapter("Luke", 1, 17);
+      loadChapter("Luke", 1, 17, currentTranslation);
 
-      async function loadAndStage(book, chapter, verse) {
-        await loadChapter(book, chapter, verse);
+      async function loadAndStage(book, chapter, verse, translation = currentTranslation) {
+        await loadChapter(book, chapter, verse, translation);
         document.querySelectorAll(".vcard").forEach((c) => {
           c.classList.remove("is-live");
           const num = parseInt(
@@ -2121,8 +2210,7 @@
           if (num === targetNum && !c.classList.contains("is-live"))
             c.classList.add("is-staged");
         });
-        loadVerseIntoStage(v);
-        setStageState(false);
+        loadVerseIntoStage(v, currentTranslation);
         const cardEl = Array.from(document.querySelectorAll(".vcard")).find(
           (c) =>
             parseInt(
@@ -2219,7 +2307,7 @@
         }
         if (searchVerse) {
           window.scriptureCaster
-            .getChapter(searchBookName, ch)
+            .getChapter(searchBookName, ch, currentTranslation)
             .then((verses) => {
               if (!verses.find((v) => v.verse === vs)) {
                 resetSearch();
@@ -2256,7 +2344,7 @@
         .getElementById("libSearchInput")
         .addEventListener("focus", async function () {
           if (searchBooks.length === 0) {
-            searchBooks = await window.scriptureCaster.getBookList();
+            searchBooks = await window.scriptureCaster.getBookList(currentTranslation);
           }
         });
 
@@ -2276,7 +2364,7 @@
               if (!book || ch < 1 || ch > book.chapters) return;
               searchMaxVerse = 0;
               window.scriptureCaster
-                .getChapter(searchBookName, ch)
+                .getChapter(searchBookName, ch, currentTranslation)
                 .then((verses) => {
                   searchMaxVerse = verses.length;
                 })
@@ -2660,13 +2748,40 @@
           Date.now() - recentParaphraseTime < PARAPHRASE_COOLDOWN_MS
         )
           return [];
-        let candidates = await window.scriptureCaster.paraphraseSearch(text);
+        const translations = await window.scriptureCaster.listTranslations();
+        const all = await Promise.all(
+          translations.map((t) =>
+            window.scriptureCaster
+              .paraphraseSearch(text, t.id)
+              .then((res) =>
+                res.map((r) => ({
+                  ...r,
+                  translation: t.id,
+                  translationName: t.name,
+                })),
+              )
+              .catch(() => []),
+          ),
+        );
+        let candidates = all.flat().filter(Boolean);
         if (candidates.length === 0) return [];
-        candidates = candidates
+        const best = new Map();
+        for (const c of candidates) {
+          const key = `${c.book}|${c.chapter}|${c.verse}`;
+          const existing = best.get(key);
+          if (
+            !existing ||
+            c.score > existing.score ||
+            (c.score === existing.score && c.translation === currentTranslation)
+          ) {
+            best.set(key, c);
+          }
+        }
+        candidates = [...best.values()]
           .sort((a, b) => b.score - a.score)
           .slice(0, MAX_PARAPHRASE_MATCHES);
         const key = candidates
-          .map((c) => `${c.book} ${c.chapter}:${c.verse}`)
+          .map((c) => `${c.translation}:${c.book} ${c.chapter}:${c.verse}`)
           .sort()
           .join("|");
         if (key === recentParaphraseKey) return [];
@@ -2683,16 +2798,22 @@
         isTop,
         isParaphrase,
         score,
+        translation = currentTranslation,
+        translationName,
       ) {
-        const verseObj = await window.scriptureCaster
-          .getChapter(book, chapter)
-          .then((vs) => vs.find((v) => v.verse === verse));
+        const displayName = translationName || translation;
+        const vs = await window.scriptureCaster.getChapter(book, chapter, translation);
+        const verseObj = vs.find((v) => v.verse === verse);
         if (!verseObj) return;
         const timeEl = document.createElement("div");
         timeEl.className = "feed-time";
         timeEl.textContent = "JUST NOW";
         const card = document.createElement("div");
         card.className = "card" + (isTop ? " top" : "");
+        const tagTxt = isParaphrase
+          ? "Paraphrase" +
+            (score != null ? " \u00B7 " + Math.round(score * 100) + "%" : "")
+          : "Reference";
         card.innerHTML =
           '<div class="card-row"><span class="card-ref">' +
           book +
@@ -2703,19 +2824,18 @@
           '</span><span class="tag ' +
           (isParaphrase ? "paraphrase" : "explicit") +
           '">' +
-          (isParaphrase
-            ? "Paraphrase" +
-              (score != null ? " \u00B7 " + Math.round(score * 100) + "%" : "")
-            : "Reference") +
+          tagTxt +
+          '</span><span class="tag translation-tag">' +
+          displayName +
           '</span></div><div class="card-snip">' +
           verseObj.text +
           '</div><div class="card-actions"><div class="mini-btn">Preview</div><div class="mini-btn primary">Push live</div></div>';
         const [previewBtn, pushBtn] = card.querySelectorAll(".mini-btn");
         previewBtn.addEventListener("click", async () => {
-          await loadAndStage(book, chapter, verse);
+          await loadAndStage(book, chapter, verse, translation);
         });
         pushBtn.addEventListener("click", async () => {
-          await loadChapter(book, chapter, verse);
+          await loadChapter(book, chapter, verse, translation);
           document.getElementById("pushLiveBtn").click();
         });
         asstFeed.insertBefore(timeEl, asstFeed.firstChild);
@@ -2848,6 +2968,9 @@
                 transcript.trim(),
                 i === 0,
                 false,
+                void 0,
+                currentTranslation,
+                currentTranslation,
               ),
             );
             if (refs.length === 0 && alt && alt.confidence >= 0.7) {
@@ -2862,6 +2985,8 @@
                     i === 0,
                     true,
                     m.score,
+                    m.translation,
+                    m.translationName,
                   ),
                 );
               });
@@ -2961,7 +3086,7 @@
           return;
         }
         searchTimer = setTimeout(async () => {
-          const results = await window.scriptureCaster.searchVerses(q);
+          const results = await window.scriptureCaster.searchVerses(q, currentTranslation);
           searchResultsEl.innerHTML = "";
           if (results.length === 0) {
             const empty = document.createElement("div");
@@ -3034,7 +3159,7 @@
             chapter: stagedVerse.chapter,
             verse: stagedVerse.n,
             text: stagedVerse.text,
-            translation: "KJV",
+            translation: currentTranslation,
             method: "explicit",
             confidence: 1,
             transcriptSnippet: "",
