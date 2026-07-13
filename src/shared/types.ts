@@ -9,11 +9,11 @@ export interface VerseMatch {
   verse: number
   endVerse?: number
   text: string
-  translation: 'KJV'
+  translation: string
   method: DetectionMethod
-  confidence: number // 0-1, mainly meaningful for semantic matches
+  confidence: number
   transcriptSnippet: string
-  detectedAt: number // epoch ms
+  detectedAt: number
 }
 
 export interface TranscriptChunk {
@@ -42,7 +42,11 @@ export interface OutputState {
   background: BackgroundSource | null
 }
 
-// Channel names shared across main/preload/renderer so they can't drift.
+export interface TranslationInfo {
+  id: string
+  name: string
+}
+
 export const IPC = {
   TRANSCRIPT_CHUNK: 'transcript:chunk',
   VERSE_DETECTED: 'verse:detected',
@@ -63,4 +67,8 @@ export const IPC = {
   BACKGROUNDS_DELETE: 'backgrounds:delete',
   OUTPUT_TOGGLE_VISIBILITY: 'output:toggle-visibility',
   SEND_ALERT: 'output:send-alert',
+  TRANSLATIONS_LIST: 'translations:list',
+  TRANSLATION_IMPORT: 'translation:import',
+  TRANSLATION_DELETE: 'translation:delete',
+  TRANSLATION_SELECT: 'translation:select',
 } as const

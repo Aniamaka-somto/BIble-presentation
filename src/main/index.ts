@@ -26,6 +26,10 @@ import {
   phraseSearch,
   paraphraseSearch,
   getBookList,
+  setTranslationsDir,
+  listTranslations,
+  importTranslation,
+  deleteTranslation,
 } from "../lib/bible";
 
 let operatorWindow: BrowserWindow | null = null;
@@ -175,6 +179,7 @@ async function importFiles(srcPaths: string[]): Promise<BackgroundItem[]> {
 
 app.whenReady().then(async () => {
   await ensureBackgroundsDir();
+  setTranslationsDir(join(app.getPath("userData"), "translations"));
 
   // Prevent display sleep while output is active (e.g. during a service)
   sleepBlockerId = powerSaveBlocker.start("prevent-display-sleep");
@@ -309,24 +314,24 @@ app.whenReady().then(async () => {
   // ---- Bible IPC ----
   ipcMain.handle(
     IPC.BIBLE_GET_CHAPTER,
-    (_event, book: string, chapter: number) => {
-      return getChapter(book, chapter);
+    (_event, book: string, chapter: number, translation?: string) => {
+      return getChapter(book, chapter, translation);
     },
   );
-  ipcMain.handle(IPC.BIBLE_SEARCH, (_event, query: string) => {
-    return smartSearch(query, 20);
+  ipcMain.handle(IPC.BIBLE_SEARCH, (_event, query: string, translation?: string) => {
+    return smartSearch(query, 20, translation);
   });
 
-  ipcMain.handle(IPC.BIBLE_PHRASE_SEARCH, (_event, query: string) => {
-    return phraseSearch(query, 10);
+  ipcMain.handle(IPC.BIBLE_PHRASE_SEARCH, (_event, query: string, translation?: string) => {
+    return phraseSearch(query, 10, translation);
   });
 
-  ipcMain.handle(IPC.BIBLE_GET_BOOKS, () => {
-    return getBookList();
+  ipcMain.handle(IPC.BIBLE_GET_BOOKS, (_event, translation?: string) => {
+    return getBookList(translation);
   });
 
-  ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, (_event, query: string) => {
-    return paraphraseSearch(query);
+  ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, (_event, query: string, translation?: string) => {
+    return paraphraseSearch(query, 5, 0.4, translation);
   });
 
   ipcMain.handle(IPC.GET_DESKTOP_AUDIO_SOURCE, async () => {
@@ -336,6 +341,31 @@ app.whenReady().then(async () => {
     });
     if (sources.length === 0) return null;
     return { id: sources[0].id, name: sources[0].name };
+  });
+
+  // ---- Translation IPC ----
+  ipcMain.handle(IPC.TRANSLATIONS_LIST, () => {
+    return listTranslations();
+  });
+
+  ipcMain.handle(IPC.TRANSLATION_IMPORT, async () => {
+    const result = await dialog.showOpenDialog(operatorWindow!, {
+      properties: ["openFile"],
+      filters: [
+        { name: "Bible Translations", extensions: ["json"] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const filePath = result.filePaths[0];
+    const raw = JSON.parse(await fs.readFile(filePath, "utf-8"));
+    const id = basename(filePath, extname(filePath));
+    importTranslation(id, raw);
+    return listTranslations();
+  });
+
+  ipcMain.handle(IPC.TRANSLATION_DELETE, (_event, id: string) => {
+    deleteTranslation(id);
+    return listTranslations();
   });
 
   app.on("activate", () => {
