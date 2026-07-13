@@ -7,6 +7,7 @@ export interface BibleVerse {
   chapter: number;
   verse: number;
   text: string;
+  endVerse?: number;
 }
 
 export interface ParaphraseMatch extends BibleVerse {
@@ -27,10 +28,20 @@ interface TranslationData {
   verses: BibleVerse[];
   chapterIndex: Map<string, BibleVerse[]>;
   bookList: BookInfo[];
+  traditionalCounts?: Map<string, number>;
 }
 
 const cache = new Map<string, TranslationData>();
 let translationsDir = "";
+
+const kjvCounts = new Map<string, number>();
+(function buildKjvCounts() {
+  for (const v of kjv as BibleVerse[]) {
+    const key = `${v.book}|${v.chapter}`;
+    const cur = kjvCounts.get(key) ?? 0;
+    if (v.verse > cur) kjvCounts.set(key, v.verse);
+  }
+})();
 
 export function setTranslationsDir(dir: string) {
   translationsDir = dir;
@@ -49,27 +60,88 @@ function translationsPath(): string {
   return translationsDir;
 }
 
-function buildData(verses: BibleVerse[]): TranslationData {
-  const chapterIndex = new Map<string, BibleVerse[]>();
+function computeCount(book: string, chapter: number, translation: string): number | undefined {
+  const data = cache.get(translation);
+  if (!data) return undefined;
+  const key = `${book} ${chapter}`;
+  const ch = data.chapterIndex.get(key);
+  if (!ch || ch.length === 0) return undefined;
+  let max = 0;
+  for (const v of ch) {
+    const end = v.endVerse ?? v.verse;
+    if (end > max) max = end;
+  }
+  return max;
+}
+
+export function getTraditionalCount(
+  book: string,
+  chapter: number,
+  translation = "KJV",
+): number | undefined {
+  const data = cache.get(translation);
+  if (data?.traditionalCounts) {
+    const c = data.traditionalCounts.get(`${book}|${chapter}`);
+    if (c !== undefined) return c;
+  }
+  const computed = computeCount(book, chapter, translation);
+  if (computed !== undefined) return computed;
+  return kjvCounts.get(`${book}|${chapter}`);
+}
+
+function detectCombined(
+  verses: BibleVerse[],
+  traditionalCounts?: Map<string, number>,
+): void {
+  const chapters = new Map<string, BibleVerse[]>();
   for (const v of verses) {
+    const key = `${v.book}|${v.chapter}`;
+    if (!chapters.has(key)) chapters.set(key, []);
+    chapters.get(key)!.push(v);
+  }
+  for (const [, ch] of chapters) {
+    ch.sort((a, b) => a.verse - b.verse);
+    for (let i = 0; i < ch.length; i++) {
+      const cur = ch[i];
+      const next = ch[i + 1];
+      if (next && next.verse > cur.verse + 1) {
+        cur.endVerse = next.verse - 1;
+      }
+    }
+    if (traditionalCounts && ch.length > 0) {
+      const last = ch[ch.length - 1];
+      const bk = `${last.book}|${last.chapter}`;
+      const maxExpected = traditionalCounts.get(bk);
+      if (maxExpected && (last.endVerse ?? last.verse) < maxExpected) {
+        last.endVerse = maxExpected;
+      }
+    }
+  }
+}
+
+function buildData(verses: BibleVerse[], counts?: Map<string, number>): TranslationData {
+  const copy: BibleVerse[] = verses.map((v) => ({ ...v }));
+  detectCombined(copy, counts);
+  const chapterIndex = new Map<string, BibleVerse[]>();
+  for (const v of copy) {
     const key = `${v.book} ${v.chapter}`;
     if (!chapterIndex.has(key)) chapterIndex.set(key, []);
     chapterIndex.get(key)!.push(v);
   }
   const seen = new Map<string, number>();
-  for (const v of verses) {
+  for (const v of copy) {
     const cur = seen.get(v.book) ?? 0;
     if (v.chapter > cur) seen.set(v.book, v.chapter);
   }
   const bookList: BookInfo[] = [];
   const done = new Set<string>();
-  for (const v of verses) {
+  for (const v of copy) {
     if (!done.has(v.book)) {
       bookList.push({ name: v.book, chapters: seen.get(v.book)! });
       done.add(v.book);
     }
   }
-  return { verses, chapterIndex, bookList };
+  return { verses: copy, chapterIndex, bookList, traditionalCounts: counts };
 }
 
 function getTranslation(name: string): TranslationData {
@@ -84,8 +156,21 @@ function getTranslation(name: string): TranslationData {
   if (!fs.existsSync(filePath)) {
     return cache.get("KJV")!;
   }
-  const raw = JSON.parse(fs.readFileSync(filePath, "utf-8")) as BibleVerse[];
-  data = buildData(raw);
+  const raw = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  const verses: BibleVerse[] = Array.isArray(raw) ? raw : raw.data;
+  let vc: Map<string, number> | undefined;
+  if (!Array.isArray(raw) && raw.verse_counts) {
+    vc = new Map<string, number>();
+    for (const [book, counts] of Object.entries(raw.verse_counts as Record<string, number[]>)) {
+      counts.forEach((c, i) => {
+        const key = `${book}|${i + 1}`;
+        const kjv = kjvCounts.get(key) ?? 0;
+        vc!.set(key, Math.max(c, kjv));
+      });
+    }
+  }
+  data = buildData(verses, vc);
+  data.traditionalCounts = vc;
   cache.set(name, data);
   return data;
 }
@@ -104,7 +189,9 @@ export function getVerse(
   verse: number,
   translation = "KJV",
 ): BibleVerse | undefined {
-  return getChapter(book, chapter, translation).find((v) => v.verse === verse);
+  return getChapter(book, chapter, translation).find(
+    (v) => v.verse <= verse && verse <= (v.endVerse ?? v.verse),
+  );
 }
 
 export function lookupReference(
@@ -118,7 +205,10 @@ export function lookupReference(
   const start = parseInt(startStr, 10);
   const end = endStr ? parseInt(endStr, 10) : start;
   return getChapter(book.trim(), chapter, translation).filter(
-    (v) => v.verse >= start && v.verse <= end,
+    (v) => {
+      const ve = v.endVerse ?? v.verse;
+      return v.verse <= end && ve >= start;
+    },
   );
 }
 
@@ -294,14 +384,19 @@ export function listTranslations(): TranslationInfo[] {
   return list;
 }
 
-export function importTranslation(id: string, verses: BibleVerse[]): void {
+export function importTranslation(
+  id: string,
+  verses: BibleVerse[],
+  verse_counts?: Record<string, number[]>,
+): void {
   const dir = translationsPath();
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+  const payload = verse_counts ? { verse_counts, data: verses } : verses;
   fs.writeFileSync(
     path.join(dir, `${id}.json`),
-    JSON.stringify(verses, null, 2),
+    JSON.stringify(payload, null, 2),
     "utf-8",
   );
   cache.delete(id);

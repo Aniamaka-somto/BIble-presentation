@@ -71,4 +71,5 @@ export const IPC = {
   TRANSLATION_IMPORT: 'translation:import',
   TRANSLATION_DELETE: 'translation:delete',
   TRANSLATION_SELECT: 'translation:select',
+  BIBLE_GET_VERSE_COUNT: 'bible:get-verse-count',
 } as const

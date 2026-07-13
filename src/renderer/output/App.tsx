@@ -174,7 +174,8 @@ function VerseDisplay({
             textShadow: "0 1px 6px rgba(0,0,0,0.5)",
           }}
         >
-          {verse.book.toUpperCase()} {verse.chapter}:{verse.verse} ·{" "}
+          {verse.book.toUpperCase()} {verse.chapter}:{verse.verse}
+          {verse.endVerse && verse.endVerse > verse.verse ? "\u2013" + verse.endVerse : ""} ·{" "}
           {verse.translation}
         </p>
       </div>

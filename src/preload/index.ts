@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('scriptureCaster', {
     ipcRenderer.invoke(IPC.BIBLE_PHRASE_SEARCH, query, translation),
   getBookList: (translation?: string) =>
     ipcRenderer.invoke(IPC.BIBLE_GET_BOOKS, translation),
+  getVerseCount: (book: string, chapter: number, translation?: string) =>
+    ipcRenderer.invoke(IPC.BIBLE_GET_VERSE_COUNT, book, chapter, translation) as Promise<number | null>,
   paraphraseSearch: (query: string, translation?: string) =>
     ipcRenderer.invoke(IPC.BIBLE_PARAPHRASE_SEARCH, query, translation),
   getDesktopAudioSource: () => ipcRenderer.invoke(IPC.GET_DESKTOP_AUDIO_SOURCE) as Promise<DesktopSource | null>,

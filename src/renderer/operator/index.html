@@ -2098,16 +2098,23 @@
           : '<span class="state-dot"></span>STAGED — not yet visible';
       }
 
+      function formatVerseNum(n, endVerse) {
+        return endVerse ? n + "\u2013" + endVerse : "" + n;
+      }
+
+      let _verseTotalCount = 0;
+
       function loadVerseIntoStage(v, translation) {
+        const numLabel = formatVerseNum(v.n, v.endVerse);
         document.getElementById("stageRef").textContent = v.ref;
         document.getElementById("stageVerse").innerHTML =
-          '<span class="num">' + v.n + "</span>" + v.text;
+          '<span class="num">' + numLabel + "</span>" + v.text;
         document.getElementById("stageCite").innerHTML = v.ref + " \u00b7 " + translation;
         document.getElementById("translationTag").textContent = translation;
         document.getElementById("navLabel").textContent =
-          "verse " + v.n + " of " + Object.keys(verseData).length;
+          "verse " + v.n + " of " + (_verseTotalCount || Object.keys(verseData).length);
         document.getElementById("splitPreviewVerse").innerHTML =
-          '<span class="num">' + v.n + "</span>" + v.text;
+          '<span class="num">' + numLabel + "</span>" + v.text;
         document.getElementById("splitPreviewCite").textContent =
           v.ref + " \u00b7 " + translation;
         fitAllStageText();
@@ -2115,9 +2122,7 @@
 
       function attachVcardHandler(card) {
         card.addEventListener("click", () => {
-          const num = parseInt(
-            card.querySelector(".vnum").textContent.replace(/\D/g, ""),
-          );
+          const num = parseInt(card.dataset.vnum, 10);
           const v = verseData[num];
           if (!v) return;
           stagedVerse = v;
@@ -2138,9 +2143,11 @@
           const card = document.createElement("div");
           card.className =
             "vcard" + (v.n === currentVerseNum ? " is-live" : "");
+          card.dataset.vnum = v.n;
+          const numLabel = formatVerseNum(v.n, v.endVerse);
           card.innerHTML =
             '<div class="vnum">' +
-            v.n +
+            numLabel +
             (v.n === currentVerseNum ? " · live" : "") +
             '</div><div class="vtext">' +
             v.text +
@@ -2157,12 +2164,15 @@
           syncTranslationUI(translation);
         }
         const verses = await window.scriptureCaster.getChapter(book, chapter, translation);
+        _verseTotalCount = await window.scriptureCaster.getVerseCount(book, chapter, translation) ?? 0;
         verseData = {};
         verses.forEach((v) => {
+          const ve = v.endVerse ?? v.verse;
           verseData[v.verse] = {
             n: v.verse,
+            endVerse: ve > v.verse ? ve : void 0,
             text: v.text,
-            ref: (book + " " + chapter + ":" + v.verse).toUpperCase(),
+            ref: (book + " " + chapter + ":" + v.verse + (ve > v.verse ? "-" + ve : "")).toUpperCase(),
             book,
             chapter,
           };
@@ -2170,23 +2180,30 @@
         document.querySelector(".filmstrip-label .chap").textContent =
           book + " " + chapter;
         document.querySelector(".filmstrip-label span:last-child").textContent =
-          verses.length + " verses";
+          (_verseTotalCount || Object.keys(verseData).length) + " verses";
         renderFilmstrip(startLive);
         stagedVerse = verseData[startLive];
+        if (!stagedVerse) {
+          const covered = Object.values(verseData).find(
+            (v) => v.n <= startLive && startLive <= (v.endVerse ?? v.n),
+          );
+          if (covered) startLive = covered.n;
+          stagedVerse = verseData[startLive];
+        }
+        if (!stagedVerse) stagedVerse = Object.values(verseData)[0] ?? null;
         loadVerseIntoStage(stagedVerse, translation);
         setStageState(true);
+        return startLive;
       }
 
       loadChapter("Luke", 1, 17, currentTranslation);
 
       async function loadAndStage(book, chapter, verse, translation = currentTranslation) {
-        await loadChapter(book, chapter, verse, translation);
+        const resolvedVerse = await loadChapter(book, chapter, verse, translation);
         document.querySelectorAll(".vcard").forEach((c) => {
           c.classList.remove("is-live");
-          const num = parseInt(
-            c.querySelector(".vnum").textContent.replace(/\D/g, ""),
-          );
-          c.classList.toggle("is-staged", num === verse);
+          const num = parseInt(c.dataset.vnum, 10);
+          c.classList.toggle("is-staged", num === resolvedVerse);
         });
         setStageState(false);
         const card = document.querySelector(".vcard.is-staged");
@@ -2203,19 +2220,14 @@
         if (!v) return;
         stagedVerse = v;
         document.querySelectorAll(".vcard").forEach((c) => {
-          const num = parseInt(
-            c.querySelector(".vnum").textContent.replace(/\D/g, ""),
-          );
+          const num = parseInt(c.dataset.vnum, 10);
           c.classList.remove("is-staged");
           if (num === targetNum && !c.classList.contains("is-live"))
             c.classList.add("is-staged");
         });
         loadVerseIntoStage(v, currentTranslation);
         const cardEl = Array.from(document.querySelectorAll(".vcard")).find(
-          (c) =>
-            parseInt(
-              c.querySelector(".vnum").textContent.replace(/\D/g, ""),
-            ) === targetNum,
+          (c) => parseInt(c.dataset.vnum, 10) === targetNum,
         );
         if (cardEl)
           cardEl.scrollIntoView({
@@ -2309,7 +2321,7 @@
           window.scriptureCaster
             .getChapter(searchBookName, ch, currentTranslation)
             .then((verses) => {
-              if (!verses.find((v) => v.verse === vs)) {
+              if (!verses.find((v) => v.verse <= vs && vs <= (v.endVerse ?? v.verse))) {
                 resetSearch();
                 return;
               }
@@ -2366,7 +2378,9 @@
               window.scriptureCaster
                 .getChapter(searchBookName, ch, currentTranslation)
                 .then((verses) => {
-                  searchMaxVerse = verses.length;
+                  searchMaxVerse = verses.reduce(
+                    (max, v) => Math.max(max, v.endVerse ?? v.verse), 0,
+                  );
                 })
                 .catch(() => {});
               searchPhase = "verse";
@@ -2800,11 +2814,17 @@
         score,
         translation = currentTranslation,
         translationName,
+        endVerse,
       ) {
         const displayName = translationName || translation;
         const vs = await window.scriptureCaster.getChapter(book, chapter, translation);
-        const verseObj = vs.find((v) => v.verse === verse);
+        const verseObj = endVerse
+          ? vs.find((v) => v.verse === verse && v.endVerse === endVerse)
+          : vs.find((v) => v.verse <= verse && verse <= (v.endVerse ?? v.verse));
         if (!verseObj) return;
+        const startV = verseObj.verse;
+        const endV = verseObj.endVerse ?? startV;
+        const refStr = book + " " + chapter + ":" + startV + (endV > startV ? "-" + endV : "");
         const timeEl = document.createElement("div");
         timeEl.className = "feed-time";
         timeEl.textContent = "JUST NOW";
@@ -2816,11 +2836,7 @@
           : "Reference";
         card.innerHTML =
           '<div class="card-row"><span class="card-ref">' +
-          book +
-          " " +
-          chapter +
-          ":" +
-          verse +
+          refStr +
           '</span><span class="tag ' +
           (isParaphrase ? "paraphrase" : "explicit") +
           '">' +
@@ -2832,10 +2848,10 @@
           '</div><div class="card-actions"><div class="mini-btn">Preview</div><div class="mini-btn primary">Push live</div></div>';
         const [previewBtn, pushBtn] = card.querySelectorAll(".mini-btn");
         previewBtn.addEventListener("click", async () => {
-          await loadAndStage(book, chapter, verse, translation);
+          await loadAndStage(book, chapter, startV, translation);
         });
         pushBtn.addEventListener("click", async () => {
-          await loadChapter(book, chapter, verse, translation);
+          await loadChapter(book, chapter, startV, translation);
           document.getElementById("pushLiveBtn").click();
         });
         asstFeed.insertBefore(timeEl, asstFeed.firstChild);
@@ -2987,6 +3003,7 @@
                     m.score,
                     m.translation,
                     m.translationName,
+                    m.endVerse,
                   ),
                 );
               });
@@ -3101,22 +3118,21 @@
             return;
           }
           results.slice(0, 8).forEach((r) => {
+            const startV = r.verse;
+            const endV = r.endVerse ?? startV;
+            const refStr = r.book + " " + r.chapter + ":" + startV + (endV > startV ? "-" + endV : "");
             const row = document.createElement("div");
             row.className = "card";
             row.style.marginBottom = "8px";
             row.style.cursor = "pointer";
             row.innerHTML =
               '<div class="card-row"><span class="card-ref">' +
-              r.book +
-              " " +
-              r.chapter +
-              ":" +
-              r.verse +
+              refStr +
               '</span></div><div class="card-snip">' +
               r.text +
               "</div>";
             row.addEventListener("click", () =>
-              loadAndStage(r.book, r.chapter, r.verse),
+              loadAndStage(r.book, r.chapter, startV),
             );
             searchResultsEl.appendChild(row);
           });
@@ -3134,8 +3150,7 @@
           .forEach((c) => c.classList.remove("is-live", "is-staged"));
         if (stagedVerse) {
           const card = Array.from(document.querySelectorAll(".vcard")).find(
-            (c) =>
-              parseInt(c.querySelector(".vnum").textContent) === stagedVerse.n,
+            (c) => parseInt(c.dataset.vnum, 10) === stagedVerse.n,
           );
           if (card) {
             card.classList.add("is-live");
@@ -3158,6 +3173,7 @@
             book: stagedVerse.book,
             chapter: stagedVerse.chapter,
             verse: stagedVerse.n,
+            endVerse: stagedVerse.endVerse,
             text: stagedVerse.text,
             translation: currentTranslation,
             method: "explicit",

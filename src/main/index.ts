@@ -30,6 +30,7 @@ import {
   listTranslations,
   importTranslation,
   deleteTranslation,
+  getTraditionalCount,
 } from "../lib/bible";
 
 let operatorWindow: BrowserWindow | null = null;
@@ -330,6 +331,10 @@ app.whenReady().then(async () => {
     return getBookList(translation);
   });
 
+  ipcMain.handle(IPC.BIBLE_GET_VERSE_COUNT, (_event, book: string, chapter: number, translation?: string) => {
+    return getTraditionalCount(book, chapter, translation) ?? null;
+  });
+
   ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, (_event, query: string, translation?: string) => {
     return paraphraseSearch(query, 5, 0.4, translation);
   });
@@ -350,16 +355,18 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(IPC.TRANSLATION_IMPORT, async () => {
     const result = await dialog.showOpenDialog(operatorWindow!, {
-      properties: ["openFile"],
+      properties: ["openFile", "multiSelections"],
       filters: [
         { name: "Bible Translations", extensions: ["json"] },
       ],
     });
     if (result.canceled || result.filePaths.length === 0) return null;
-    const filePath = result.filePaths[0];
-    const raw = JSON.parse(await fs.readFile(filePath, "utf-8"));
-    const id = basename(filePath, extname(filePath));
-    importTranslation(id, raw);
+    for (const filePath of result.filePaths) {
+      const raw = JSON.parse(await fs.readFile(filePath, "utf-8"));
+      const id = basename(filePath, extname(filePath));
+      const verses = Array.isArray(raw) ? raw : raw.data;
+      importTranslation(id, verses, Array.isArray(raw) ? void 0 : raw.verse_counts);
+    }
     return listTranslations();
   });
 
