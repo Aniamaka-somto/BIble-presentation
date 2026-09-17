@@ -336,7 +336,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, (_event, query: string, translation?: string) => {
-    return paraphraseSearch(query, 5, 0.4, translation);
+    return paraphraseSearch(query, 5, 0.7, translation);
   });
 
   ipcMain.handle(IPC.GET_DESKTOP_AUDIO_SOURCE, async () => {

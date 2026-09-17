@@ -258,7 +258,7 @@ function tokenize(text: string): string[] {
 export function paraphraseSearch(
   query: string,
   limit = 5,
-  threshold = 0.4,
+  threshold = 0.7,
   translation = "KJV",
 ): ParaphraseMatch[] {
   const { verses } = getTranslation(translation);
@@ -295,22 +295,23 @@ export function paraphraseSearch(
     }
     if (matches < minMatches) continue;
     const rawScore = matches / queryWords.length;
-    let orderBonus = 1;
+    let orderScore = 1;
     let proximityBonus = 1;
     if (matchPositions.length >= 2) {
-      let inOrder = true;
-      for (let i = 1; i < matchPositions.length; i++) {
-        if (matchPositions[i] < matchPositions[i - 1]) {
-          inOrder = false;
-          break;
+      let orderedPairs = 0;
+      let totalPairs = 0;
+      for (let i = 0; i < matchPositions.length; i++) {
+        for (let j = i + 1; j < matchPositions.length; j++) {
+          totalPairs++;
+          if (matchPositions[i] < matchPositions[j]) orderedPairs++;
         }
       }
-      if (!inOrder) orderBonus = 0.7;
+      orderScore = orderedPairs / totalPairs;
       const span = Math.max(...matchPositions) - Math.min(...matchPositions);
       proximityBonus = 0.6 + 0.4 * Math.max(0, 1 - span / Math.max(1, maxSpan));
     }
-    const adjusted = rawScore * orderBonus * proximityBonus;
-    const score = Math.round(adjusted * adjusted * 100) / 100;
+    const adjusted = rawScore * orderScore * proximityBonus;
+    const score = Math.round(adjusted * 100) / 100;
     if (score >= threshold) {
       results.push({ ...v, score });
     }

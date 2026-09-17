@@ -2237,6 +2237,36 @@
           });
       }
 
+      async function navigateChapter(dir) {
+        if (!stagedVerse) return;
+        const books = await window.scriptureCaster.getBookList(currentTranslation);
+        const curIdx = books.findIndex((b) => b.name === stagedVerse.book);
+        if (curIdx === -1) return;
+
+        const isNext = dir > 0;
+        const newChapter = stagedVerse.chapter + dir;
+
+        if (newChapter >= 1 && newChapter <= books[curIdx].chapters) {
+          const verse = isNext
+            ? 1
+            : ((await window.scriptureCaster.getVerseCount(
+                stagedVerse.book, newChapter, currentTranslation,
+              )) ?? 1);
+          await loadAndStage(stagedVerse.book, newChapter, verse);
+        } else if (isNext) {
+          const nextIdx = curIdx + 1 < books.length ? curIdx + 1 : 0;
+          await loadAndStage(books[nextIdx].name, 1, 1);
+        } else {
+          const prevIdx = curIdx - 1 >= 0 ? curIdx - 1 : books.length - 1;
+          const lastChap = books[prevIdx].chapters;
+          const lastVerse =
+            (await window.scriptureCaster.getVerseCount(
+              books[prevIdx].name, lastChap, currentTranslation,
+            )) ?? 1;
+          await loadAndStage(books[prevIdx].name, lastChap, lastVerse);
+        }
+      }
+
       document.getElementById("prevBtn").addEventListener("click", () => {
         if (!stagedVerse) return;
         const keys = Object.keys(verseData)
@@ -2244,6 +2274,7 @@
           .sort((a, b) => a - b);
         const idx = keys.indexOf(stagedVerse.n);
         if (idx > 0) stepToVerse(keys[idx - 1]);
+        else navigateChapter(-1);
       });
 
       document.getElementById("nextBtn").addEventListener("click", () => {
@@ -2253,6 +2284,7 @@
           .sort((a, b) => a - b);
         const idx = keys.indexOf(stagedVerse.n);
         if (idx < keys.length - 1) stepToVerse(keys[idx + 1]);
+        else navigateChapter(1);
       });
 
       document.getElementById("libList").addEventListener("click", (e) => {
