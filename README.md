@@ -15,13 +15,14 @@ scripture-caster/
 │   ├── preload/         Context-bridge API exposed to renderers as window.scriptureCaster
 │   ├── shared/          Types + IPC channel names, imported by all three processes
 │   ├── lib/
-│   │   ├── detection/   referenceParser.ts (explicit refs), semanticMatcher.ts (quoted verses) — TODO
-│   │   └── bible/       Local KJV corpus + lookup — TODO
+│   │   ├── detection/   books.ts + numbers.ts (spoken-number/book aliases),
+│   │   │                referenceParser.ts (explicit refs). semanticMatcher.ts (quoted verses) — TODO
+│   │   └── bible/       Local KJV corpus + lookup
 │   └── renderer/
-│       ├── operator/    Control console — plain HTML/CSS/JS (no React needed here).
-│       │                Combined/Split output modes, LOGO/BLACK/CLEAR, alerts modal,
-│       │                today's order, filmstrip with real verse text, AI detection
-│       │                feed, staged→live flow. "Push live" calls the real IPC bridge.
+│       ├── operator/    Control console (React + zustand). Combined/Split output
+│       │                modes, LOGO/BLACK/CLEAR, alerts modal, today's order,
+│       │                filmstrip with real verse text, AI detection feed,
+│       │                staged→live flow. "Push live" calls the real IPC bridge.
 │       └── output/      Fullscreen display window (React) — this is what you project
 │                        or OBS-capture. Listens for state changes from the operator.
 ├── electron.vite.config.ts   Two renderer entry points (operator, output)
@@ -30,11 +31,11 @@ scripture-caster/
 
 ## Status
 
-The operator console UI is fully built out and wired to real IPC — clicking a
-verse in the filmstrip stages it, "Push live" sends it to the actual output
-window via `window.scriptureCaster.pushLive()`, and the output window updates
-live. Right now the verses shown are hardcoded demo data (`verseData` in
-`operator/index.html`) — the next step is replacing that with real detection.
+The operator console is fully built out in React + zustand and wired to real
+IPC — clicking a verse in the filmstrip stages it, "Push live" sends it to the
+actual output window via `window.scriptureCaster.pushLive()`, and the output
+window updates live. Chapters, translations, search, and the Deepgram live
+detection feed all hit the real backend; there is no hardcoded demo data.
 
 ## Next steps
 
@@ -42,10 +43,9 @@ live. Right now the verses shown are hardcoded demo data (`verseData` in
 2. `npm run dev` — opens both windows. Click a filmstrip card, then "Push
    live," and confirm the output window updates. Drag the output window onto
    your second display or add it in OBS as a Window Capture source.
-3. Wire mic capture + streaming STT into the operator renderer (start with the
-   Web Speech API for the MVP) in place of the hardcoded `verseData`.
-4. Fill in `referenceParser.ts` — spoken-number normalization + book-name
-   fuzzy matching (STT commonly mishears book names).
-5. Load the KJV corpus into SQLite/Postgres with `pgvector` for the semantic
-   quote-matching path, and replace the demo filmstrip/queue with real
-   detection results.
+3. `npm run typecheck` / `npm run build` before shipping.
+4. Improve the quoted-without-reference path: today it uses token-overlap
+   scoring in `paraphraseSearch`; a dense semantic matcher
+   (`semanticMatcher.ts`, pgvector) would handle looser paraphrase.
+5. Populate the schedule and songs/media/web library tabs, which are still
+   placeholders.

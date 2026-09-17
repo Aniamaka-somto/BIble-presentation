@@ -1,0 +1,234 @@
+import { useCallback, useEffect, useRef } from 'react'
+import { useOperator } from '../store'
+import { parseExplicitReferences } from '../../../lib/detection/referenceParser'
+import { paraphraseScout } from '../lib/paraphrase'
+import type { DetectionInput } from '../types'
+
+const AUDIO_CONSTRAINTS: MediaStreamConstraints['audio'] = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+}
+
+const DG_URL =
+  'wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&sample_rate=48000'
+
+const MAX_RECONNECT = 10
+
+function getBestMimeType(): string {
+  const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+  for (const t of types) {
+    if (MediaRecorder.isTypeSupported(t)) return t
+  }
+  return ''
+}
+
+export function useDeepgram() {
+  const status = useOperator((s) => s.listeningStatus)
+  const reconnectAttempts = useOperator((s) => s.reconnectAttempts)
+  const setStatus = useOperator((s) => s.setListeningStatus)
+  const setReconnectAttempts = useOperator((s) => s.setReconnectAttempts)
+  const setTranscript = useOperator((s) => s.setTranscript)
+
+  const statusRef = useRef(status)
+  statusRef.current = status
+
+  const wsRef = useRef<WebSocket | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const attemptsRef = useRef(0)
+  const timerRef = useRef<number | null>(null)
+
+  const stop = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    attemptsRef.current = 0
+    setReconnectAttempts(0)
+    if (recorderRef.current) {
+      recorderRef.current.stop()
+      recorderRef.current = null
+    }
+    if (wsRef.current) {
+      wsRef.current.onclose = null
+      wsRef.current.close()
+      wsRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    setStatus('idle')
+  }, [setStatus, setReconnectAttempts])
+
+  const startRef = useRef<() => Promise<void>>(async () => {})
+  const stopRef = useRef(stop)
+  stopRef.current = stop
+
+  const start = useCallback(async () => {
+    const key = await useOperator.getState().openDgKeyPrompt()
+    if (!key) {
+      setStatus('idle')
+      return
+    }
+    if (!navigator.onLine) {
+      setStatus('offline')
+      return
+    }
+    setStatus('initializing')
+
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS })
+    } catch {
+      setStatus('idle')
+      return
+    }
+    streamRef.current = stream
+
+    const mimeType = getBestMimeType()
+    const ws = new WebSocket(DG_URL, ['token', key])
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      let recorder: MediaRecorder
+      const opts = { audioBitsPerSecond: 64000, ...(mimeType ? { mimeType } : {}) }
+      try {
+        recorder = new MediaRecorder(stream, opts)
+      } catch (e) {
+        console.error('MediaRecorder init failed, trying without mimeType', e)
+        recorder = new MediaRecorder(stream, { audioBitsPerSecond: 64000 })
+      }
+      recorderRef.current = recorder
+      recorder.addEventListener('dataavailable', (e) => {
+        if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(e.data)
+      })
+      recorder.addEventListener('error', () => stopRef.current())
+      recorder.start(250)
+    }
+
+    ws.onmessage = (message) => {
+      const data = JSON.parse(message.data)
+      const alt = data.channel?.alternatives?.[0]
+      const transcript = alt?.transcript
+      if (!transcript) return
+      setTranscript(transcript)
+      if (data.is_final) {
+        const refs = parseExplicitReferences(transcript)
+        refs.forEach((r, i) => {
+          const input: DetectionInput = {
+            book: r.book,
+            chapter: r.chapter,
+            verse: r.verse,
+            snippet: transcript.trim(),
+            isTop: i === 0,
+            isParaphrase: false,
+            translation: useOperator.getState().currentTranslation,
+            translationName: useOperator.getState().currentTranslation,
+          }
+          useOperator.getState().addDetection(input)
+        })
+        if (refs.length === 0 && alt.confidence >= 0.7) {
+          paraphraseScout(transcript, useOperator.getState().currentTranslation).then((matches) => {
+            if (!matches || matches.length === 0) return
+            matches.forEach((m, i) => {
+              const input: DetectionInput = {
+                book: m.book,
+                chapter: m.chapter,
+                verse: m.verse,
+                endVerse: m.endVerse,
+                snippet: transcript.trim(),
+                isTop: i === 0,
+                isParaphrase: true,
+                score: m.score,
+                translation: m.translation,
+                translationName: m.translationName,
+              }
+              useOperator.getState().addDetection(input)
+            })
+          })
+        }
+      }
+    }
+
+    ws.onerror = (err) => {
+      console.error('Deepgram error', err)
+    }
+
+    ws.onclose = () => {
+      console.log('Deepgram connection closed')
+      scheduleReconnectRef.current()
+    }
+
+    attemptsRef.current = 0
+    setReconnectAttempts(0)
+    setStatus('listening')
+  }, [setStatus, setReconnectAttempts, setTranscript])
+
+  startRef.current = start
+
+  const scheduleReconnect = useCallback(() => {
+    const s = statusRef.current
+    if (s !== 'listening' && s !== 'reconnecting') return
+    if (!navigator.onLine) {
+      setStatus('offline')
+      return
+    }
+    if (attemptsRef.current >= MAX_RECONNECT) {
+      console.error('Deepgram max reconnection attempts reached')
+      stopRef.current()
+      return
+    }
+    attemptsRef.current += 1
+    setReconnectAttempts(attemptsRef.current)
+    const delay = Math.min(1000 * Math.pow(2, attemptsRef.current - 1), 30000)
+    setStatus('reconnecting')
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null
+      startRef.current().catch(() => {})
+    }, delay)
+  }, [setStatus, setReconnectAttempts])
+
+  const scheduleReconnectRef = useRef(scheduleReconnect)
+  scheduleReconnectRef.current = scheduleReconnect
+
+  useEffect(() => {
+    const onOffline = () => {
+      if (statusRef.current === 'idle') return
+      setReconnectAttempts(0)
+      setStatus('offline')
+    }
+    const onOnline = () => {
+      if (statusRef.current === 'idle') return
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) return
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+      attemptsRef.current = 0
+      startRef.current().catch(() => {})
+    }
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('online', onOnline)
+    return () => {
+      window.removeEventListener('offline', onOffline)
+      window.removeEventListener('online', onOnline)
+      stopRef.current()
+    }
+  }, [setReconnectAttempts, setStatus])
+
+  const transcript = useOperator((s) => s.transcript)
+
+  const toggle = useCallback(() => {
+    if (statusRef.current === 'idle') {
+      startRef.current().catch((err: Error) => {
+        alert('Could not start listening: ' + err.message)
+      })
+    } else {
+      stopRef.current()
+    }
+  }, [])
+
+  return { status, reconnectAttempts, transcript, toggle }
+}

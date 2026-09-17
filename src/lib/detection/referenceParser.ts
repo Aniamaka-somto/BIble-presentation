@@ -1,6 +1,8 @@
 // Detects explicit references like "John 3:16" or "turn to Philippians
-// chapter four verse thirteen" inside a rolling transcript window.
-// This is a skeleton - fill in BOOK_ALIASES and the number-word map next.
+// chapter four verse thirteen" inside a live transcript window.
+
+import { BOOK_LOOKUP } from "./books";
+import { normalizeNumbers } from "./numbers";
 
 export interface ParsedReference {
   book: string
@@ -10,22 +12,31 @@ export interface ParsedReference {
   matchedText: string
 }
 
-const NUMBER_WORDS: Record<string, number> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10
-  // extend through common chapter/verse ranges
-}
+const BOOK_CAPTURE =
+  "((?:[123](?:st|nd|rd)?\\s+)?(?:first\\s+|second\\s+|third\\s+)?[a-z]+(?:\\s+of\\s+[a-z]+)?)";
 
-// Maps common mis-transcriptions and spoken variants to canonical book names.
-// e.g. STT often hears "Philippians" as "Philippines" - correct those here.
-const BOOK_ALIASES: Record<string, string> = {
-  philippines: 'Philippians',
-  revelations: 'Revelation'
-  // extend with full 66-book alias table
-}
+const REF_PATTERN = new RegExp(
+  "\\b" +
+    BOOK_CAPTURE +
+    "(?:\\s+chapter)?\\s+(\\d{1,3})(?:\\s*:\\s*|\\s+verse\\s+|\\s+)(\\d{1,3})\\b",
+  "gi",
+);
 
 export function parseExplicitReferences(transcript: string): ParsedReference[] {
-  // TODO: normalize spoken numbers, fuzzy-match book names via BOOK_ALIASES,
-  // then run a regex like /(\w+)\s+(\d+)[:\s](\d+)(?:-(\d+))?/ against the
-  // normalized text.
-  return []
+  const normalized = normalizeNumbers(transcript);
+  const found: ParsedReference[] = [];
+  let m: RegExpExecArray | null;
+  REF_PATTERN.lastIndex = 0;
+  while ((m = REF_PATTERN.exec(normalized)) !== null) {
+    const rawBook = m[1].trim().toLowerCase();
+    const canonical = BOOK_LOOKUP.get(rawBook);
+    if (!canonical) continue;
+    found.push({
+      book: canonical,
+      chapter: parseInt(m[2], 10),
+      verse: parseInt(m[3], 10),
+      matchedText: m[0],
+    });
+  }
+  return found;
 }

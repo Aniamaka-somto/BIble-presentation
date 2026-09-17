@@ -47,6 +47,49 @@ export interface TranslationInfo {
   name: string
 }
 
+export interface BibleVerseRef {
+  book: string
+  chapter: number
+  verse: number
+  endVerse?: number
+  text: string
+}
+
+export interface ParaphraseMatchRef extends BibleVerseRef {
+  score: number
+}
+
+export interface BookRef {
+  name: string
+  chapters: number
+}
+
+// Full surface of window.scriptureCaster (exposed by the preload bridge).
+export interface ScriptureCasterApi {
+  pushLive(verse: VerseMatch): void
+  clearLive(): void
+  setBlankMode(mode: BlankMode): void
+  setBackground(source: BackgroundSource): Promise<void>
+  clearBackground(): Promise<void>
+  getBackgrounds(): Promise<BackgroundItem[]>
+  importBackgrounds(): Promise<BackgroundItem[]>
+  deleteBackground(id: string): Promise<void>
+  getChapter(book: string, chapter: number, translation?: string): Promise<BibleVerseRef[]>
+  searchVerses(query: string, translation?: string): Promise<BibleVerseRef[]>
+  phraseSearch(query: string, translation?: string): Promise<BibleVerseRef[]>
+  getBookList(translation?: string): Promise<BookRef[]>
+  getVerseCount(book: string, chapter: number, translation?: string): Promise<number | null>
+  paraphraseSearch(query: string, translation?: string): Promise<ParaphraseMatchRef[]>
+  getDesktopAudioSource(): Promise<{ id: string; name: string } | null>
+  toggleOutputVisibility(): void
+  sendAlert(message: string): void
+  listTranslations(): Promise<TranslationInfo[]>
+  importTranslation(): Promise<TranslationInfo[] | null>
+  deleteTranslation(id: string): Promise<TranslationInfo[]>
+  onOutputStateChanged(cb: (state: OutputState) => void): () => void
+  onAlert(cb: (message: string) => void): () => void
+}
+
 export const IPC = {
   TRANSCRIPT_CHUNK: 'transcript:chunk',
   VERSE_DETECTED: 'verse:detected',

@@ -7,15 +7,6 @@ import {
 } from "react";
 import type { OutputState, VerseMatch } from "../../shared/types";
 
-declare global {
-  interface Window {
-    scriptureCaster: {
-      onOutputStateChanged: (cb: (state: OutputState) => void) => () => void;
-      onAlert: (cb: (message: string) => void) => () => void;
-    };
-  }
-}
-
 // Background image/video layer rendered behind the verse text.
 // Uses the custom bg:// protocol registered in the main process.
 function BgLayer({
