@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import {
   IPC, type VerseMatch, type OutputState, type BlankMode,
   type BackgroundItem, type BackgroundSource, type TranslationInfo,
+  type SemanticProgress,
 } from '../shared/types'
 
 interface DesktopSource {
@@ -30,6 +31,8 @@ contextBridge.exposeInMainWorld('scriptureCaster', {
     ipcRenderer.invoke(IPC.BIBLE_GET_VERSE_COUNT, book, chapter, translation) as Promise<number | null>,
   paraphraseSearch: (query: string, translation?: string) =>
     ipcRenderer.invoke(IPC.BIBLE_PARAPHRASE_SEARCH, query, translation),
+  paraphraseSearchAll: (query: string, translations: string[]) =>
+    ipcRenderer.invoke(IPC.BIBLE_PARAPHRASE_SEARCH_ALL, query, translations),
   getDesktopAudioSource: () => ipcRenderer.invoke(IPC.GET_DESKTOP_AUDIO_SOURCE) as Promise<DesktopSource | null>,
   toggleOutputVisibility: () => ipcRenderer.send(IPC.OUTPUT_TOGGLE_VISIBILITY),
   sendAlert: (message: string) => ipcRenderer.send(IPC.SEND_ALERT, message),
@@ -45,5 +48,10 @@ contextBridge.exposeInMainWorld('scriptureCaster', {
     const listener = (_event: Electron.IpcRendererEvent, message: string) => callback(message)
     ipcRenderer.on(IPC.SEND_ALERT, listener)
     return () => ipcRenderer.removeListener(IPC.SEND_ALERT, listener)
+  },
+  onSemanticProgress: (callback: (progress: SemanticProgress) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: SemanticProgress) => callback(progress)
+    ipcRenderer.on(IPC.SEMANTIC_PROGRESS, listener)
+    return () => ipcRenderer.removeListener(IPC.SEMANTIC_PROGRESS, listener)
   }
 })

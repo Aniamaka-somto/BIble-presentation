@@ -24,37 +24,36 @@ export async function paraphraseScout(
     return []
   }
   const translations = await api.listTranslations()
-  const all = await Promise.all(
-    translations.map((t) =>
-      api
-        .paraphraseSearch(text, t.id)
-        .then((res) =>
-          res.map((r) => ({
-            ...r,
-            translation: t.id,
-            translationName: t.name,
-          })),
-        )
-        .catch(() => []),
-    ),
-  )
-  let candidates = all.flat().filter(Boolean) as ParaphraseCandidate[]
-  if (candidates.length === 0) return []
+  const ids = translations.map((t) => t.id)
+  const matches = await api
+    .paraphraseSearchAll(text, ids)
+    .then((res) =>
+      res.map((r) => {
+        const t = translations.find((t2) => t2.id === (r as { translation?: string }).translation)
+        return {
+          ...r,
+          translation: t?.id ?? preferredTranslation,
+          translationName: t?.name ?? preferredTranslation,
+        }
+      }),
+    )
+    .catch(() => [])
   const best = new Map<string, ParaphraseCandidate>()
-  for (const c of candidates) {
-    const key = `${c.book}|${c.chapter}|${c.verse}`
+  for (const m of matches) {
+    const key = `${m.book}|${m.chapter}|${m.verse}`
     const existing = best.get(key)
     if (
       !existing ||
-      c.score > existing.score ||
-      (c.score === existing.score && c.translation === preferredTranslation)
+      m.score > existing.score ||
+      (m.score === existing.score && m.translation === preferredTranslation)
     ) {
-      best.set(key, c)
+      best.set(key, { ...m, translation: m.translation, translationName: m.translationName })
     }
   }
-  candidates = [...best.values()]
+  const candidates = [...best.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, MAX_PARAPHRASE_MATCHES)
+  if (candidates.length === 0) return []
   const key = candidates
     .map((c) => `${c.translation}:${c.book} ${c.chapter}:${c.verse}`)
     .sort()

@@ -12,6 +12,7 @@ import {
 import { join, extname, basename } from "path";
 import { pathToFileURL } from "url";
 import * as fs from "fs/promises";
+import { existsSync } from "fs";
 import {
   IPC,
   type VerseMatch,
@@ -32,6 +33,16 @@ import {
   deleteTranslation,
   getTraditionalCount,
 } from "../lib/bible";
+import {
+  setSemanticCacheDir,
+  setSemanticModelDir,
+  setBundledIndexDir,
+  onSemanticProgress,
+  semanticSearch,
+  semanticSearchAll,
+  ensureSemanticReady,
+  type SemanticProgress,
+} from "../lib/semantic";
 
 let operatorWindow: BrowserWindow | null = null;
 let outputWindow: BrowserWindow | null = null;
@@ -72,7 +83,8 @@ function createOperatorWindow() {
       outputWindow = null;
     }
   });
-}
+
+  }
 
 let outputDisplayId: number | null = null; // Keep track of which monitor we are on
 
@@ -181,6 +193,22 @@ async function importFiles(srcPaths: string[]): Promise<BackgroundItem[]> {
 app.whenReady().then(async () => {
   await ensureBackgroundsDir();
   setTranslationsDir(join(app.getPath("userData"), "translations"));
+
+  // Bundled model + prebuilt indexes live under <app>/resources (dev) or
+  // <install>/resources (packaged, via electron-builder extraResources).
+  const resourcesDir = app.isPackaged
+    ? join(process.resourcesPath, "resources")
+    : join(app.getAppPath(), "resources");
+  const bundledModelDir = join(resourcesDir, "models", "Xenova", "all-MiniLM-L6-v2");
+  setSemanticCacheDir(join(app.getPath("userData"), "semantic"));
+  if (existsSync(join(bundledModelDir, "config.json"))) {
+    setSemanticModelDir(join(resourcesDir, "models"));
+  }
+  setBundledIndexDir(join(resourcesDir, "index"));
+
+  onSemanticProgress((progress: SemanticProgress) => {
+    operatorWindow?.webContents.send(IPC.SEMANTIC_PROGRESS, progress);
+  });
 
   // Prevent display sleep while output is active (e.g. during a service)
   sleepBlockerId = powerSaveBlocker.start("prevent-display-sleep");
@@ -335,8 +363,46 @@ app.whenReady().then(async () => {
     return getTraditionalCount(book, chapter, translation) ?? null;
   });
 
-  ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, (_event, query: string, translation?: string) => {
-    return paraphraseSearch(query, 5, 0.7, translation);
+  const fallbackParaphrase = (query: string, translation?: string) =>
+    paraphraseSearch(query, 5, 0.7, translation);
+
+  ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, async (_event, query: string, translation?: string) => {
+    try {
+      const matches = await semanticSearch(query, 8, 0.5, translation);
+      if (matches.length > 0) return matches;
+      return fallbackParaphrase(query, translation);
+    } catch {
+      return fallbackParaphrase(query, translation);
+    }
+  });
+
+  ipcMain.handle(
+    IPC.BIBLE_PARAPHRASE_SEARCH_ALL,
+    async (_event, query: string, translations: string[]) => {
+      const ids =
+        translations && translations.length > 0
+          ? translations
+          : listTranslations().map((t) => t.id);
+      try {
+        const matches = await semanticSearchAll(query, ids, 8, 0.5);
+        if (matches.length > 0) return matches;
+      } catch {
+        // fall through to token matcher
+      }
+      const fallbackAll = ids.flatMap((id) => fallbackParaphrase(query, id));
+      const best = new Map<string, (typeof fallbackAll)[number]>();
+      for (const m of fallbackAll) {
+        const key = `${m.book}|${m.chapter}|${m.verse}`;
+        const existing = best.get(key);
+        if (!existing || m.score > existing.score) best.set(key, m);
+      }
+      return [...best.values()].sort((a, b) => b.score - a.score).slice(0, 8);
+    },
+  );
+
+  // Prewarm the semantic model so indexing starts before the first quote.
+  ensureSemanticReady().catch((err) => {
+    console.error("Semantic model warmup failed:", err);
   });
 
   ipcMain.handle(IPC.GET_DESKTOP_AUDIO_SOURCE, async () => {

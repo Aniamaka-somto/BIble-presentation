@@ -16,7 +16,10 @@ scripture-caster/
 │   ├── shared/          Types + IPC channel names, imported by all three processes
 │   ├── lib/
 │   │   ├── detection/   books.ts + numbers.ts (spoken-number/book aliases),
-│   │   │                referenceParser.ts (explicit refs). semanticMatcher.ts (quoted verses) — TODO
+│   │   │                referenceParser.ts (explicit refs)
+│   │   ├── semantic/    Local embedding engine (@xenova/transformers). Per-translation
+│   │   │                verse-index cache on disk; paraphrase search ranks by cosine
+│   │   │                similarity
 │   │   └── bible/       Local KJV corpus + lookup
 │   └── renderer/
 │       ├── operator/    Control console (React + zustand). Combined/Split output
@@ -37,6 +40,19 @@ actual output window via `window.scriptureCaster.pushLive()`, and the output
 window updates live. Chapters, translations, search, and the Deepgram live
 detection feed all hit the real backend; there is no hardcoded demo data.
 
+Detection has two paths. Explicit spoken references (book, chapter, verse) are
+parsed directly, and with AUTO on they push straight to the live screen. The
+quoted-without-reference path runs an embedded paraphrase detector
+(`all-MiniLM-L6-v2` via `@xenova/transformers`, quantized) that ranks verses by
+cosine similarity against a per-translation precomputed index (threshold ~0.5,
+top 8); the old token-overlap `paraphraseSearch` remains as a fallback.
+Paraphrases only *suggest* — they never auto-push. Both suggestions and feeds
+are quiet for 30s after any push (reading lock). The model and verse index are
+cached under the app's userData (`semantic/`), so only the first ever run
+downloads the model and builds the KJV index (a few minutes). Semantic engine
+status (downloading / indexing / errors) shows in the operator console while it
+loads.
+
 ## Next steps
 
 1. `npm install`
@@ -44,8 +60,9 @@ detection feed all hit the real backend; there is no hardcoded demo data.
    live," and confirm the output window updates. Drag the output window onto
    your second display or add it in OBS as a Window Capture source.
 3. `npm run typecheck` / `npm run build` before shipping.
-4. Improve the quoted-without-reference path: today it uses token-overlap
-   scoring in `paraphraseSearch`; a dense semantic matcher
-   (`semanticMatcher.ts`, pgvector) would handle looser paraphrase.
+4. Expand paraphrase detection: raise/lower the cosine threshold in
+   `src/lib/semantic/index.ts` (`semanticSearch`), switch to a larger embedding
+   model, or enable the multi-threaded WASM backend to speed up first-time
+   indexing.
 5. Populate the schedule and songs/media/web library tabs, which are still
    placeholders.

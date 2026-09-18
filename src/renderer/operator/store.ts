@@ -53,6 +53,9 @@ interface OperatorState {
   feed: DetectionCard[]
   autoPush: boolean
 
+  // Reading lock: suppresses paraphrase suggestions shortly after any push.
+  lastPushAt: number | null
+
   // Listening
   listeningStatus: ListeningStatus
   reconnectAttempts: number
@@ -103,6 +106,8 @@ interface OperatorState {
   openDgKeyPrompt: () => Promise<string | null>
   submitDgKey: (key: string | null) => void
 }
+
+export const READING_LOCK_MS = 30000
 
 let dgResolve: ((key: string | null) => void) | null = null
 
@@ -155,6 +160,7 @@ export const useOperator = create<OperatorState>((set, get) => ({
 
   feed: [],
   autoPush: false,
+  lastPushAt: null,
 
   listeningStatus: 'idle',
   reconnectAttempts: 0,
@@ -285,7 +291,7 @@ export const useOperator = create<OperatorState>((set, get) => ({
   pushLive: () => {
     const { stagedVerse, currentTranslation } = get()
     if (!stagedVerse) return
-    set({ liveVerseNum: stagedVerse.n, isLive: true, liveVerse: stagedVerse, blankMode: 'none' })
+    set({ liveVerseNum: stagedVerse.n, isLive: true, liveVerse: stagedVerse, blankMode: 'none', lastPushAt: Date.now() })
     api.pushLive({
       id: stagedVerse.ref,
       book: stagedVerse.book,

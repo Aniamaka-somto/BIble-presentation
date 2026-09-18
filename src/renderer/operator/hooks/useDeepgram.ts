@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { useOperator } from '../store'
+import { useOperator, READING_LOCK_MS } from '../store'
 import { parseExplicitReferences } from '../../../lib/detection/referenceParser'
 import { paraphraseScout } from '../lib/paraphrase'
 import type { DetectionInput } from '../types'
@@ -14,6 +14,25 @@ const DG_URL =
   'wss://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&interim_results=true&punctuate=true&sample_rate=48000'
 
 const MAX_RECONNECT = 10
+const UTTERANCE_SILENCE_MS = 1200
+
+function mergeFinalText(prev: string, next: string): string {
+  const a = prev.trim()
+  const b = next.trim()
+  if (!a) return b
+  if (!b || a === b) return a
+  if (b.startsWith(a)) return b
+  if (a.startsWith(b)) return a
+  const aWords = a.split(/\s+/)
+  const bWords = b.split(/\s+/)
+  const overlap = Math.min(aWords.length, bWords.length, 8)
+  for (let k = overlap; k > 0; k--) {
+    if (aWords.slice(-k).join(' ') === bWords.slice(0, k).join(' ')) {
+      return aWords.concat(bWords.slice(k)).join(' ')
+    }
+  }
+  return a + ' ' + b
+}
 
 function getBestMimeType(): string {
   const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
@@ -38,12 +57,19 @@ export function useDeepgram() {
   const streamRef = useRef<MediaStream | null>(null)
   const attemptsRef = useRef(0)
   const timerRef = useRef<number | null>(null)
+  const utteranceRef = useRef<string>('')
+  const scoutTimerRef = useRef<number | null>(null)
 
   const stop = useCallback(() => {
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current)
       timerRef.current = null
     }
+    if (scoutTimerRef.current !== null) {
+      clearTimeout(scoutTimerRef.current)
+      scoutTimerRef.current = null
+    }
+    utteranceRef.current = ''
     attemptsRef.current = 0
     setReconnectAttempts(0)
     if (recorderRef.current) {
@@ -114,42 +140,57 @@ export function useDeepgram() {
       const transcript = alt?.transcript
       if (!transcript) return
       setTranscript(transcript)
-      if (data.is_final) {
-        const refs = parseExplicitReferences(transcript)
-        refs.forEach((r, i) => {
-          const input: DetectionInput = {
-            book: r.book,
-            chapter: r.chapter,
-            verse: r.verse,
-            snippet: transcript.trim(),
-            isTop: i === 0,
-            isParaphrase: false,
-            translation: useOperator.getState().currentTranslation,
-            translationName: useOperator.getState().currentTranslation,
-          }
-          useOperator.getState().addDetection(input)
-        })
-        if (refs.length === 0 && alt.confidence >= 0.7) {
-          paraphraseScout(transcript, useOperator.getState().currentTranslation).then((matches) => {
-            if (!matches || matches.length === 0) return
-            matches.forEach((m, i) => {
-              const input: DetectionInput = {
-                book: m.book,
-                chapter: m.chapter,
-                verse: m.verse,
-                endVerse: m.endVerse,
-                snippet: transcript.trim(),
-                isTop: i === 0,
-                isParaphrase: true,
-                score: m.score,
-                translation: m.translation,
-                translationName: m.translationName,
-              }
-              useOperator.getState().addDetection(input)
-            })
-          })
+      if (!data.is_final) return
+      utteranceRef.current = mergeFinalText(utteranceRef.current, transcript)
+      const combined = utteranceRef.current
+
+      const refs = parseExplicitReferences(transcript)
+      refs.forEach((r, i) => {
+        const input: DetectionInput = {
+          book: r.book,
+          chapter: r.chapter,
+          verse: r.verse,
+          snippet: transcript.trim(),
+          isTop: i === 0,
+          isParaphrase: false,
+          translation: useOperator.getState().currentTranslation,
+          translationName: useOperator.getState().currentTranslation,
         }
-      }
+        useOperator.getState().addDetection(input)
+      })
+
+      if (scoutTimerRef.current !== null) clearTimeout(scoutTimerRef.current)
+      scoutTimerRef.current = window.setTimeout(() => {
+        scoutTimerRef.current = null
+        const text = combined.trim()
+        utteranceRef.current = ''
+        if (!text) return
+        const state = useOperator.getState()
+        const readingLocked =
+          state.lastPushAt != null && Date.now() - state.lastPushAt < READING_LOCK_MS
+        const wordCount = text.split(/\s+/).length
+        if (readingLocked || wordCount > 60) return
+        if (parseExplicitReferences(text).length > 0) return
+        if (alt.confidence < 0.7) return
+        paraphraseScout(text, state.currentTranslation).then((matches) => {
+          if (!matches || matches.length === 0) return
+          matches.forEach((m, i) => {
+            const input: DetectionInput = {
+              book: m.book,
+              chapter: m.chapter,
+              verse: m.verse,
+              endVerse: m.endVerse,
+              snippet: text,
+              isTop: i === 0,
+              isParaphrase: true,
+              score: m.score,
+              translation: m.translation,
+              translationName: m.translationName,
+            }
+            useOperator.getState().addDetection(input)
+          })
+        })
+      }, 1200)
     }
 
     ws.onerror = (err) => {

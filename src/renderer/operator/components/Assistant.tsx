@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useState } from 'react'
-import { useOperator } from '../store'
+import { useOperator, READING_LOCK_MS } from '../store'
 import { api } from '../api'
 import { InfoIcon, SearchIcon, StarIcon } from './icons'
-import type { BibleVerseRef } from '../../../shared/types'
+import type { BibleVerseRef, SemanticProgress } from '../../../shared/types'
 
 export function Assistant() {
   const currentTranslation = useOperator((s) => s.currentTranslation)
@@ -12,10 +12,25 @@ export function Assistant() {
   const feed = useOperator((s) => s.feed)
   const autoPush = useOperator((s) => s.autoPush)
   const toggleAutoPush = useOperator((s) => s.toggleAutoPush)
+  const lastPushAt = useOperator((s) => s.lastPushAt)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<BibleVerseRef[]>([])
   const [searching, setSearching] = useState(false)
+  const [semantic, setSemantic] = useState<SemanticProgress | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  const readingLocked = lastPushAt != null && now - lastPushAt < READING_LOCK_MS
+
+  useEffect(() => {
+    if (lastPushAt == null) return
+    const t = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(t)
+  }, [lastPushAt])
+
+  useEffect(() => {
+    return api.onSemanticProgress(setSemantic)
+  }, [])
 
   useEffect(() => {
     const q = query.trim()
@@ -65,10 +80,23 @@ export function Assistant() {
           </div>
         </div>
         <div className="asst-sub">
-          {autoPush
-            ? 'AUTO · spoken references go straight to the live screen'
-            : 'Listening · suggests, never pushes'}
+          {readingLocked
+            ? 'Reading · suggestions paused while on screen'
+            : autoPush
+              ? 'AUTO · spoken references go straight to the live screen'
+              : 'Listening · suggests, never pushes'}
         </div>
+        {semantic && semantic.phase !== 'ready' && semantic.phase !== 'idle' && (
+          <div className="asst-eng-status">
+            {semantic.phase === 'error'
+              ? 'Semantic engine unavailable — using basic matcher'
+              : semantic.phase === 'download'
+                ? `Downloading semantic model… ${semantic.done}%`
+                : semantic.phase === 'indexing'
+                  ? `Indexing ${semantic.translation ?? ''} ${semantic.done}/${semantic.total}`
+                  : null}
+          </div>
+        )}
       </div>
       <div className="asst-search">
         <SearchIcon />

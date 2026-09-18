@@ -64,6 +64,16 @@ export interface BookRef {
   chapters: number
 }
 
+export type SemanticPhase = 'idle' | 'download' | 'indexing' | 'ready' | 'error'
+
+export interface SemanticProgress {
+  phase: SemanticPhase
+  translation?: string
+  done: number
+  total: number
+  detail?: string
+}
+
 // Full surface of window.scriptureCaster (exposed by the preload bridge).
 export interface ScriptureCasterApi {
   pushLive(verse: VerseMatch): void
@@ -80,6 +90,7 @@ export interface ScriptureCasterApi {
   getBookList(translation?: string): Promise<BookRef[]>
   getVerseCount(book: string, chapter: number, translation?: string): Promise<number | null>
   paraphraseSearch(query: string, translation?: string): Promise<ParaphraseMatchRef[]>
+  paraphraseSearchAll(query: string, translations: string[]): Promise<ParaphraseMatchRef[]>
   getDesktopAudioSource(): Promise<{ id: string; name: string } | null>
   toggleOutputVisibility(): void
   sendAlert(message: string): void
@@ -88,6 +99,7 @@ export interface ScriptureCasterApi {
   deleteTranslation(id: string): Promise<TranslationInfo[]>
   onOutputStateChanged(cb: (state: OutputState) => void): () => void
   onAlert(cb: (message: string) => void): () => void
+  onSemanticProgress(cb: (progress: SemanticProgress) => void): () => void
 }
 
 export const IPC = {
@@ -105,6 +117,7 @@ export const IPC = {
   BIBLE_GET_BOOKS: 'bible:get-books',
   GET_DESKTOP_AUDIO_SOURCE: 'desktop:get-audio-source',
   BIBLE_PARAPHRASE_SEARCH: 'bible:paraphrase-search',
+  BIBLE_PARAPHRASE_SEARCH_ALL: 'bible:paraphrase-search-all',
   BACKGROUNDS_LIST: 'backgrounds:list',
   BACKGROUNDS_IMPORT: 'backgrounds:import',
   BACKGROUNDS_DELETE: 'backgrounds:delete',
@@ -115,4 +128,5 @@ export const IPC = {
   TRANSLATION_DELETE: 'translation:delete',
   TRANSLATION_SELECT: 'translation:select',
   BIBLE_GET_VERSE_COUNT: 'bible:get-verse-count',
+  SEMANTIC_PROGRESS: 'semantic:progress',
 } as const

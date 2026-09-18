@@ -323,6 +323,20 @@ export function getBookList(translation = "KJV"): BookInfo[] {
   return getTranslation(translation).bookList;
 }
 
+export function getAllVerses(translation = "KJV"): BibleVerse[] {
+  return getTranslation(translation).verses;
+}
+
+export function getTranslationStamp(translation = "KJV"): string {
+  if (translation === "KJV") return "kjv-builtin";
+  const filePath = path.join(translationsPath(), `${translation}.json`);
+  try {
+    return String(fs.statSync(filePath).mtimeMs);
+  } catch {
+    return "missing";
+  }
+}
+
 export function searchText(
   query: string,
   limit = 20,
