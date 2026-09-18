@@ -1134,6 +1134,79 @@
         height: 15px;
         color: var(--blue-2);
       }
+      .asst-head-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .auto-switch {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex-shrink: 0;
+      }
+      .auto-switch-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        transition: color 0.15s ease;
+      }
+      .auto-switch-label.on {
+        color: var(--blue-2);
+      }
+      .switch {
+        position: relative;
+        width: 36px;
+        height: 20px;
+        border-radius: 999px;
+        background: var(--bg-3);
+        border: 1px solid var(--line);
+        cursor: pointer;
+        flex-shrink: 0;
+        padding: 0;
+        transition: background 0.15s ease, border-color 0.15s ease;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .switch:hover {
+        border-color: var(--text-dim);
+      }
+      .switch:active .k {
+        width: 16px;
+      }
+      .switch .k {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--text-mid);
+        transition: transform 0.18s ease, background 0.15s ease;
+      }
+      .switch:focus-visible {
+        outline: 2px solid var(--blue-2);
+        outline-offset: 2px;
+      }
+      .switch.on {
+        background: var(--blue);
+        border-color: var(--blue);
+      }
+      .switch.on:hover {
+        background: var(--blue-2);
+        border-color: var(--blue-2);
+      }
+      .switch.on .k {
+        transform: translateX(16px);
+        background: #fff;
+      }
+      .switch.on:active .k {
+        width: 16px;
+      }
       .asst-sub {
         font-size: 12px;
         color: var(--text-lo);

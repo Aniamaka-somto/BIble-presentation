@@ -10,6 +10,8 @@ export function Assistant() {
   const loadChapter = useOperator((s) => s.loadChapter)
   const pushLive = useOperator((s) => s.pushLive)
   const feed = useOperator((s) => s.feed)
+  const autoPush = useOperator((s) => s.autoPush)
+  const toggleAutoPush = useOperator((s) => s.toggleAutoPush)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<BibleVerseRef[]>([])
@@ -43,11 +45,30 @@ export function Assistant() {
   return (
     <div className="assistant">
       <div className="asst-head">
-        <div className="asst-title">
-          <StarIcon />
-          Detection
+        <div className="asst-head-row">
+          <div className="asst-title">
+            <StarIcon />
+            Detection
+          </div>
+          <div className="auto-switch">
+            <span className={'auto-switch-label' + (autoPush ? ' on' : '')}>AUTO</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoPush}
+              aria-label="Auto-push spoken references to the live screen"
+              className={'switch' + (autoPush ? ' on' : '')}
+              onClick={toggleAutoPush}
+            >
+              <span className="k"></span>
+            </button>
+          </div>
         </div>
-        <div className="asst-sub">Listening · suggests, never pushes</div>
+        <div className="asst-sub">
+          {autoPush
+            ? 'AUTO · spoken references go straight to the live screen'
+            : 'Listening · suggests, never pushes'}
+        </div>
       </div>
       <div className="asst-search">
         <SearchIcon />
@@ -141,7 +162,7 @@ export function Assistant() {
         ))}
         <div className="feed-note">
           <InfoIcon />
-          Nothing pushes without you
+          {autoPush ? 'AUTO is on — flip it off to take full control' : 'Nothing pushes without you'}
         </div>
       </div>
     </div>

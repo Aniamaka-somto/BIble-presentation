@@ -51,6 +51,7 @@ interface OperatorState {
 
   // Assistant
   feed: DetectionCard[]
+  autoPush: boolean
 
   // Listening
   listeningStatus: ListeningStatus
@@ -90,6 +91,7 @@ interface OperatorState {
   selectSchedule: (id: string) => void
 
   addDetection: (input: DetectionInput) => Promise<void>
+  toggleAutoPush: () => void
 
   setListeningStatus: (status: ListeningStatus) => void
   setReconnectAttempts: (n: number) => void
@@ -152,6 +154,7 @@ export const useOperator = create<OperatorState>((set, get) => ({
   activeBackground: null,
 
   feed: [],
+  autoPush: false,
 
   listeningStatus: 'idle',
   reconnectAttempts: 0,
@@ -384,7 +387,14 @@ export const useOperator = create<OperatorState>((set, get) => ({
       timeLabel: 'JUST NOW',
     }
     set({ feed: [card, ...feed] })
+
+    if (get().autoPush && input.isTop && !input.isParaphrase) {
+      await get().loadAndStage(card.book, card.chapter, card.verse, card.translation)
+      get().pushLive()
+    }
   },
+
+  toggleAutoPush: () => set((s) => ({ autoPush: !s.autoPush })),
 
   setListeningStatus: (listeningStatus) => set({ listeningStatus }),
   setReconnectAttempts: (reconnectAttempts) => set({ reconnectAttempts }),
