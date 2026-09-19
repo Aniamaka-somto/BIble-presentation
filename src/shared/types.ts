@@ -51,6 +51,7 @@ export interface SlidePart {
 export interface SlideBlock {
   ref: string
   parts: SlidePart[]
+  translation?: string
 }
 
 export interface Slide {
@@ -141,6 +142,7 @@ export interface ScriptureCasterApi {
   onOutputStateChanged(cb: (state: OutputState) => void): () => void
   onAlert(cb: (message: string) => void): () => void
   onSemanticProgress(cb: (progress: SemanticProgress) => void): () => void
+  saveTranscript(text: string): Promise<string | null>
   openSettingsPage(page: SettingsPage): Promise<void>
 }
 
@@ -171,5 +173,6 @@ export const IPC = {
   TRANSLATION_SELECT: 'translation:select',
   BIBLE_GET_VERSE_COUNT: 'bible:get-verse-count',
   SEMANTIC_PROGRESS: 'semantic:progress',
+  TRANSCRIPT_SAVE: 'transcript:save',
   OPEN_SETTINGS_PAGE: 'settings:open-page',
 } as const

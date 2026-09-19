@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOperator } from '../store'
 import { useDeepgram } from '../hooks/useDeepgram'
 import { normalizeNumbers } from '../../../lib/detection/numbers'
@@ -68,8 +68,12 @@ function TranscriptText({ text, refs }: { text: string; refs: LineRef[] }) {
 
 export function Transcript() {
   const lines = useOperator((s) => s.transcriptLines)
+  const loudness = useOperator((s) => s.loudness)
   const clearTranscript = useOperator((s) => s.clearTranscript)
+  const saveTranscript = useOperator((s) => s.saveTranscript)
   const { status, toggle } = useDeepgram()
+
+  const [saveMsg, setSaveMsg] = useState('')
 
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -79,6 +83,12 @@ export function Transcript() {
     const el = bodyRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [lines])
+
+  const onSave = async () => {
+    const path = await saveTranscript()
+    setSaveMsg(path ? 'Saved' : 'Nothing to save yet')
+    window.setTimeout(() => setSaveMsg(''), 1600)
+  }
 
   const groups = useMemo(() => {
     const out: Array<{ chunk: number; lines: TranscriptLine[] }> = []
@@ -98,12 +108,9 @@ export function Transcript() {
           <div className="panel-sub">DEEPGRAM · X32 CH 4</div>
         </div>
         <div className="tr-head-right">
-          <div className={`vu${listening ? ' active' : ''}`} aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          <button className="text-link" onClick={onSave}>
+            {saveMsg || 'Save'}
+          </button>
           <button className="text-link" onClick={clearTranscript}>
             Clear
           </button>
@@ -127,6 +134,7 @@ export function Transcript() {
         ))}
       </div>
       <div className="tr-foot">
+        <LoudnessMeter level={loudness} active={listening} />
         <button
           className={`tr-toggle${listening ? ' on' : ''}`}
           onClick={toggle}
@@ -137,5 +145,23 @@ export function Transcript() {
         </button>
       </div>
     </section>
+  )
+}
+
+const METER_SEGMENTS = 14
+
+function LoudnessMeter({ level, active }: { level: number; active: boolean }) {
+  const lit = Math.round(level * METER_SEGMENTS)
+  const segs: Array<'lo' | 'mid' | 'hi'> = []
+  for (let i = 0; i < METER_SEGMENTS; i++) {
+    const t = i / METER_SEGMENTS
+    segs.push(t >= 0.86 ? 'hi' : t >= 0.72 ? 'mid' : 'lo')
+  }
+  return (
+    <div className={`vu-meter${active ? ' live' : ''}`} aria-hidden="true" title="Input level">
+      {segs.map((cls, i) => (
+        <span key={i} className={`${cls}${i < lit ? ' lit' : ''}`} />
+      ))}
+    </div>
   )
 }

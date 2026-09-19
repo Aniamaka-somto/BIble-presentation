@@ -41,7 +41,7 @@ function rangeLabel(list: StackItem[]): string {
 export function verseSlide(
   ref: string,
   text: string,
-  opts?: { index?: string | number }
+  opts?: { index?: string | number; translation?: string }
 ): Slide {
   const num =
     opts?.index !== undefined && opts.index !== "" ? Number(opts.index) : undefined;
@@ -49,6 +49,7 @@ export function verseSlide(
     {
       ref,
       parts: num !== undefined ? [{ text, num }] : [{ text }],
+      translation: opts?.translation,
     },
   ];
   return {

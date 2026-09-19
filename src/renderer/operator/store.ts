@@ -68,6 +68,8 @@ interface OperatorState {
   listeningStatus: ListeningStatus
   reconnectAttempts: number
   transcriptLines: TranscriptLine[]
+  loudness: number
+  fullTranscript: string
 
   // Modals
   alertsOpen: boolean
@@ -117,6 +119,8 @@ interface OperatorState {
   commitTranscriptFinal: (text: string, refs: { book: string; matchedText: string }[], chunk: number) => void
   updateInterim: (text: string, chunk: number) => void
   clearTranscript: () => void
+  setLoudness: (level: number) => void
+  saveTranscript: () => Promise<string | null>
 
   setAlertsOpen: (open: boolean) => void
   sendAlert: (message: string) => void
@@ -190,6 +194,8 @@ export const useOperator = create<OperatorState>((set, get) => ({
   listeningStatus: 'idle',
   reconnectAttempts: 0,
   transcriptLines: [],
+  loudness: 0,
+  fullTranscript: '',
 
   alertsOpen: false,
   dgKeyOpen: false,
@@ -229,7 +235,7 @@ export const useOperator = create<OperatorState>((set, get) => ({
     const target = Object.values(s.verseData).find(
       (x) => x.n <= vs && vs <= (x.endVerse ?? x.n)
     )
-    if (target) s.setStaged(verseSlide(target.ref, target.text), prevEntry)
+    if (target) s.setStaged(verseSlide(target.ref, target.text, { translation: id }), prevEntry)
   },
 
   loadChapter: async (book, chapter, translation) => {
@@ -290,7 +296,7 @@ export const useOperator = create<OperatorState>((set, get) => ({
     const v = verses.find((x) => x.verse <= verse && verse <= (x.endVerse ?? x.verse))
     if (!v) return null
     const ref = formatRef(book, chapter, v.verse, v.endVerse ?? v.verse)
-    const slide = verseSlide(ref, v.text)
+    const slide = verseSlide(ref, v.text, { translation: t })
     slide.refs = [formatRef(book, chapter, verse, ve)]
     return slide
   },
@@ -308,7 +314,7 @@ export const useOperator = create<OperatorState>((set, get) => ({
       verse && verse >= 1
         ? entries.find((x) => x.n <= verse && verse <= (x.endVerse ?? x.n))
         : entries[0]
-    if (target) get().setStaged(verseSlide(target.ref, target.text), null)
+    if (target) get().setStaged(verseSlide(target.ref, target.text, { translation: t }), null)
   },
 
   stepStagedVerse: async (dir) => {
@@ -325,12 +331,12 @@ export const useOperator = create<OperatorState>((set, get) => ({
 
     if (dir > 0 && idx < keys.length - 1) {
       const entry = s.verseData[keys[idx + 1]]
-      if (entry) get().setStaged(verseSlide(entry.ref, entry.text), null)
+      if (entry) get().setStaged(verseSlide(entry.ref, entry.text, { translation: s.currentTranslation }), null)
       return
     }
     if (dir < 0 && idx > 0) {
       const entry = s.verseData[keys[idx - 1]]
-      if (entry) get().setStaged(verseSlide(entry.ref, entry.text), null)
+      if (entry) get().setStaged(verseSlide(entry.ref, entry.text, { translation: s.currentTranslation }), null)
       return
     }
 
@@ -572,7 +578,10 @@ export const useOperator = create<OperatorState>((set, get) => ({
           chunk,
         })
       }
-      return { transcriptLines: lines.slice(-MAX_TRANSCRIPT_LINES) }
+      return {
+        transcriptLines: lines.slice(-MAX_TRANSCRIPT_LINES),
+        fullTranscript: s.fullTranscript ? s.fullTranscript + "\n\n" + text.trim() : text.trim(),
+      }
     })
   },
 
@@ -589,7 +598,15 @@ export const useOperator = create<OperatorState>((set, get) => ({
     })
   },
 
-  clearTranscript: () => set({ transcriptLines: [] }),
+  clearTranscript: () => set({ transcriptLines: [], fullTranscript: '' }),
+
+  setLoudness: (loudness) => set({ loudness }),
+
+  saveTranscript: async () => {
+    const text = get().fullTranscript.trim()
+    if (!text) return null
+    return api.saveTranscript(text)
+  },
 
   setAlertsOpen: (alertsOpen) => set({ alertsOpen }),
   sendAlert: (message) => {

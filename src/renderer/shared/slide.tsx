@@ -61,7 +61,10 @@ export function SlideView({ slide }: { slide: Slide }) {
                   </Fragment>
                 ))}
               </div>
-              <div className="s-ref">{b.ref.toUpperCase()}</div>
+              <div className="s-ref">
+                {b.ref.toUpperCase()}
+                {b.translation ? <span className="s-version"> · {b.translation.toUpperCase()}</span> : null}
+              </div>
             </div>
           ))}
         </div>

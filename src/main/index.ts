@@ -168,8 +168,8 @@ function createSettingsWindow(page: SettingsPage) {
     settingsWindow = null;
   }
   settingsWindow = new BrowserWindow({
-    width: 980,
-    height: 720,
+    width: 1180,
+    height: 780,
     minWidth: 860,
     minHeight: 600,
     parent: operatorWindow && !operatorWindow.isDestroyed() ? operatorWindow : undefined,
@@ -502,6 +502,30 @@ app.whenReady().then(async () => {
     .catch((err) => {
       console.error("Semantic model warmup failed:", err);
     });
+
+  ipcMain.handle(
+    IPC.TRANSCRIPT_SAVE,
+    async (_event, text: string) => {
+      const content = typeof text === "string" ? text.trim() : "";
+      if (!content) return null;
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const parent =
+        operatorWindow && !operatorWindow.isDestroyed() ? operatorWindow : undefined;
+      const result = await dialog.showSaveDialog(parent!, {
+        title: "Save transcription",
+        defaultPath: join(app.getPath("documents"), `transcription-${stamp}.txt`),
+        filters: [{ name: "Text files", extensions: ["txt"] }],
+      });
+      if (result.canceled || !result.filePath) return null;
+      try {
+        await fs.writeFile(result.filePath, content + "\n", "utf-8");
+        return result.filePath;
+      } catch (err) {
+        console.error("Save transcription failed:", err);
+        return null;
+      }
+    },
+  );
 
   ipcMain.handle(IPC.GET_DESKTOP_AUDIO_SOURCE, async () => {
     const sources = await desktopCapturer.getSources({

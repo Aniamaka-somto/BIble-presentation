@@ -54,5 +54,7 @@ contextBridge.exposeInMainWorld('scriptureCaster', {
     ipcRenderer.on(IPC.SEMANTIC_PROGRESS, listener)
     return () => ipcRenderer.removeListener(IPC.SEMANTIC_PROGRESS, listener)
   },
+  saveTranscript: (text: string) =>
+    ipcRenderer.invoke(IPC.TRANSCRIPT_SAVE, text) as Promise<string | null>,
   openSettingsPage: (page: SettingsPage) => ipcRenderer.invoke(IPC.OPEN_SETTINGS_PAGE, page),
 })

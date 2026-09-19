@@ -4,6 +4,7 @@ import { FONT_CSS, LONGEST, SAMPLE_VERSES, type Store } from './data'
 export interface SlideBlock {
   ref: string
   parts: Array<{ num?: number; text: string }>
+  translation?: string
 }
 
 export interface Slide {
@@ -15,7 +16,7 @@ const chapterOf = (ref: string) => ref.replace(/:\d+$/, '')
 const verseNo = (ref: string) => ref.split(':').pop() ?? ''
 
 function verseSlide(ref: string, text: string): Slide {
-  return { label: ref, blocks: [{ ref, parts: [{ text }] }] }
+  return { label: ref, blocks: [{ ref, parts: [{ text }], translation: 'KJV' }] }
 }
 
 function stackSlide(list: Array<{ ref: string; text: string }>): Slide {
@@ -23,7 +24,7 @@ function stackSlide(list: Array<{ ref: string; text: string }>): Slide {
   if (list.every((v) => chapterOf(v.ref) === chapterOf(list[0].ref))) {
     const nums = list.map((v) => +verseNo(v.ref))
     const ref = `${chapterOf(list[0].ref)}:${nums.join(', ')}`
-    return { label: ref, blocks: [{ ref, parts: list.map((v) => ({ num: +verseNo(v.ref), text: v.text })) }] }
+    return { label: ref, blocks: [{ ref, parts: list.map((v) => ({ num: +verseNo(v.ref), text: v.text })), translation: 'KJV' }] }
   }
   return { label: 'stacked', blocks: list.map((v) => ({ ref: v.ref, parts: [{ text: v.text }] })) }
 }
@@ -106,7 +107,10 @@ function SlideView({ slide, display, onFit }: { slide: Slide; display: Store['di
                     </span>
                   ))}
                 </div>
-                <div className="s-ref">{b.ref.toUpperCase()}</div>
+                <div className="s-ref">
+                    {b.ref.toUpperCase()}
+                    {b.translation ? <span className="s-version"> · {b.translation.toUpperCase()}</span> : null}
+                  </div>
               </div>
             ))}
           </div>

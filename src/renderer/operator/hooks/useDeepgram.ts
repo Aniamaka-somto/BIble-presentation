@@ -54,6 +54,10 @@ export function useDeepgram() {
   const wsRef = useRef<WebSocket | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const meterDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
+  const rafRef = useRef<number | null>(null)
   const attemptsRef = useRef(0)
   const timerRef = useRef<number | null>(null)
   const utteranceRef = useRef<string>('')
@@ -85,6 +89,17 @@ export function useDeepgram() {
       streamRef.current.getTracks().forEach((t) => t.stop())
       streamRef.current = null
     }
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+    analyserRef.current = null
+    meterDataRef.current = null
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
+    useOperator.getState().setLoudness(0)
     setStatus('idle')
   }, [setStatus, setReconnectAttempts])
 
@@ -112,6 +127,35 @@ export function useDeepgram() {
       return
     }
     streamRef.current = stream
+
+    try {
+      const audioCtx = new AudioContext()
+      const source = audioCtx.createMediaStreamSource(stream)
+      const analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 512
+      analyser.smoothingTimeConstant = 0.55
+      source.connect(analyser)
+      audioCtxRef.current = audioCtx
+      analyserRef.current = analyser
+      meterDataRef.current = new Uint8Array(analyser.fftSize)
+      const loop = () => {
+        if (!analyserRef.current || !meterDataRef.current) return
+        analyserRef.current.getByteTimeDomainData(meterDataRef.current)
+        const data = meterDataRef.current
+        let sum = 0
+        for (let i = 0; i < data.length; i++) {
+          const v = (data[i] - 128) / 128
+          sum += v * v
+        }
+        const rms = Math.sqrt(sum / data.length)
+        const db = rms > 0.0001 ? 20 * Math.log10(rms) : -60
+        useOperator.getState().setLoudness(Math.min(1, Math.max(0, (db + 60) / 60)))
+        rafRef.current = requestAnimationFrame(loop)
+      }
+      rafRef.current = requestAnimationFrame(loop)
+    } catch (err) {
+      console.error("Loudness meter init failed", err)
+    }
 
     const mimeType = getBestMimeType()
     const ws = new WebSocket(DG_URL, ['token', key])
