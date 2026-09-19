@@ -12,7 +12,7 @@ import type {
   VersePick,
   ContextResult,
 } from './types'
-import type { Slide, BackgroundItem, BackgroundSource, TranslationInfo } from '../../shared/types'
+import type { Slide, BackgroundItem, BackgroundSource, TranslationInfo, BookRef } from '../../shared/types'
 import { verseSlide, stackSlide } from './lib/slideBuild'
 import type { SlideFit } from '../shared/slide'
 
@@ -82,6 +82,8 @@ interface OperatorState {
   loadChapter: (book: string, chapter: number, translation?: string) => Promise<void>
   navigateChapter: (dir: number) => Promise<void>
   stageBibleVerse: (book: string, chapter: number, verse: number, endVerse?: number, translation?: string) => Promise<Slide | null>
+  stageAndOpenRef: (book: string, chapter: number, verse?: number) => Promise<void>
+  stepStagedVerse: (dir: number) => Promise<void>
 
   setBrowserTab: (tab: BrowserTab) => void
   setContextQuery: (q: string) => void
@@ -142,6 +144,14 @@ function formatRef(book: string, chapter: number, startV: number, endV?: number)
 
 function slideRefKey(slide: Slide): string {
   return slide.refs.join('|')
+}
+
+function canonicalBook(books: BookRef[], name: string): string {
+  const lower = name.toLowerCase().replace(/^\d+\s+/, '').replace(/\s+/g, '')
+  for (const b of books) {
+    if (b.name.toLowerCase().replace(/\s+/g, '') === lower) return b.name
+  }
+  return name
 }
 
 export const useOperator = create<OperatorState>((set, get) => ({
@@ -274,6 +284,73 @@ export const useOperator = create<OperatorState>((set, get) => ({
 
   setBrowserTab: (browserTab) => set({ browserTab, picks: [] }),
   setContextQuery: (contextQuery) => set({ contextQuery }),
+
+  stageAndOpenRef: async (book, chapter, verse) => {
+    const t = get().currentTranslation
+    const bookName = canonicalBook(await api.getBookList(t), book)
+    await get().loadChapter(bookName, chapter, t)
+    const data = get().verseData
+    const entries = Object.values(data)
+    const target =
+      verse && verse >= 1
+        ? entries.find((x) => x.n <= verse && verse <= (x.endVerse ?? x.n))
+        : entries[0]
+    if (target) get().setStaged(verseSlide(target.ref, target.text), null)
+  },
+
+  stepStagedVerse: async (dir) => {
+    const s = get()
+    if (!s.staged) return
+    const refs = (s.staged.refs ?? []).filter(Boolean)
+    if (refs.length !== 1) return
+    const m = refs[0].match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/)
+    if (!m || !s.lastChapter) return
+
+    const keys = Object.keys(s.verseData).map(Number).sort((a, b) => a - b)
+    const idx = keys.indexOf(Number(m[3]))
+    if (idx === -1) return
+
+    if (dir > 0 && idx < keys.length - 1) {
+      const entry = s.verseData[keys[idx + 1]]
+      if (entry) get().setStaged(verseSlide(entry.ref, entry.text), null)
+      return
+    }
+    if (dir < 0 && idx > 0) {
+      const entry = s.verseData[keys[idx - 1]]
+      if (entry) get().setStaged(verseSlide(entry.ref, entry.text), null)
+      return
+    }
+
+    // chapter / book wrap
+    const t = s.currentTranslation
+    const chapterBooks = await api.getBookList(t)
+    const book = canonicalBook(chapterBooks, m[1])
+    const bookIdx = chapterBooks.findIndex((b) => b.name === book)
+    if (bookIdx === -1) return
+    if (dir > 0) {
+      const newChapter = s.lastChapter.chapter + 1
+      const curBook = chapterBooks[bookIdx]
+      if (newChapter <= curBook.chapters) {
+        await get().stageAndOpenRef(book, newChapter, 1)
+      } else {
+        const nextIdx = bookIdx + 1 < chapterBooks.length ? bookIdx + 1 : 0
+        await get().stageAndOpenRef(chapterBooks[nextIdx].name, 1, 1)
+      }
+      return
+    }
+    const newChapter = s.lastChapter.chapter - 1
+    const curBook = chapterBooks[bookIdx]
+    if (newChapter >= 1) {
+      const lastVerse = (await api.getVerseCount(book, newChapter, t)) ?? 1
+      await get().stageAndOpenRef(book, newChapter, lastVerse)
+    } else {
+      const prevIdx = bookIdx - 1 >= 0 ? bookIdx - 1 : chapterBooks.length - 1
+      const lastChap = chapterBooks[prevIdx].chapters
+      const lastVerse =
+        (await api.getVerseCount(chapterBooks[prevIdx].name, lastChap, t)) ?? 1
+      await get().stageAndOpenRef(chapterBooks[prevIdx].name, lastChap, lastVerse)
+    }
+  },
 
   runContextSearch: async () => {
     const { contextQuery, currentTranslation } = get()

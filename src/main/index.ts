@@ -33,6 +33,8 @@ import {
   deleteTranslation,
   getTraditionalCount,
 } from "../lib/bible";
+
+app.setName("scripture-caster");
 import {
   setSemanticCacheDir,
   setSemanticModelDir,
