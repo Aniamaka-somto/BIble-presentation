@@ -26,7 +26,7 @@ export async function paraphraseScout(
   const translations = await api.listTranslations()
   const ids = translations.map((t) => t.id)
   const matches = await api
-    .paraphraseSearchAll(text, ids)
+    .paraphraseSearchAll(text, ids, preferredTranslation)
     .then((res) =>
       res.map((r) => {
         const t = translations.find((t2) => t2.id === (r as { translation?: string }).translation)

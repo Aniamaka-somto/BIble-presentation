@@ -38,6 +38,7 @@ export function VerseBrowser() {
   const stepStagedVerse = useOperator((s) => s.stepStagedVerse)
   const addToSchedule = useOperator((s) => s.addToSchedule)
   const setStaged = useOperator((s) => s.setStaged)
+  const goLive = useOperator((s) => s.goLive)
   const staged = useOperator((s) => s.staged)
   const togglePick = useOperator((s) => s.togglePick)
   const clearPicks = useOperator((s) => s.clearPicks)
@@ -50,8 +51,12 @@ export function VerseBrowser() {
 
   const gridRef = useRef<HTMLDivElement>(null)
   const refEl = useRef<HTMLInputElement>(null)
+  const ghostEl = useRef<HTMLDivElement>(null)
   const [refInput, setRefInput] = useState('')
+  const [ghost, setGhost] = useState('')
   const [ctxInput, setCtxInput] = useState('')
+  const [transOpen, setTransOpen] = useState(false)
+  const transWrap = useRef<HTMLDivElement>(null)
   const [books, setBooks] = useState<BookRef[]>([])
   const [animRef, setAnimRef] = useState<string | null>(null)
   const ctxTimer = useRef<number | null>(null)
@@ -63,7 +68,6 @@ export function VerseBrowser() {
   const searchVerse = useRef('')
   const searchMaxVerse = useRef(0)
   const suppressSet = useRef(false)
-  const deleting = useRef(false)
   const pendingSel = useRef<{ from: number; to: number } | null>(null)
 
   useLayoutEffect(() => {
@@ -104,6 +108,24 @@ export function VerseBrowser() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [clearPicks])
+
+  useEffect(() => {
+    if (!transOpen) return
+    const onDown = (e: globalThis.MouseEvent) => {
+      if (transWrap.current && !transWrap.current.contains(e.target as Node)) {
+        setTransOpen(false)
+      }
+    }
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTransOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [transOpen])
 
   useEffect(() => {
     return () => {
@@ -151,6 +173,11 @@ export function VerseBrowser() {
         }))
 
   // ----- EasyWorship-style phased reference search -----
+  // The book phase is non-destructive: the input only ever holds the letters
+  // the operator typed, and the completion is shown as a trailing "ghost" that
+  // never replaces them. Matching is a plain prefix check (aliases for
+  // abbreviations like matt) — a typed letter can never be silently dropped,
+  // so you can't get the old "…1o -> Obadiah" leap.
   function findBook(prefix: string): BookRef | null {
     const lower = prefix.toLowerCase().replace(/\s+/g, '')
     if (!lower) return null
@@ -159,16 +186,13 @@ export function VerseBrowser() {
       if (key.startsWith(lower)) return b
     }
     const alias = bookAliases[lower]
-    if (alias) return books.find((b) => b.name === alias) ?? null
-    const noNum = lower.replace(/^\d/, '')
-    if (noNum !== lower) {
-      for (const b of books) {
-        const key = b.name
-          .toLowerCase()
-          .replace(/^\d+\s+/, '')
-          .replace(/\s+/g, '')
-        if (key.startsWith(noNum)) return b
-      }
+    if (alias) {
+      const target = alias.toLowerCase().replace(/\s+/g, '')
+      return (
+        books.find((b) => b.name.toLowerCase().replace(/\s+/g, '') === target) ??
+        books.find((b) => b.name.toLowerCase().replace(/\s+/g, '').startsWith(target)) ??
+        null
+      )
     }
     return null
   }
@@ -185,6 +209,7 @@ export function VerseBrowser() {
     searchChapter.current = ''
     searchVerse.current = ''
     searchMaxVerse.current = 0
+    setGhost('')
   }
 
   function commitSearch() {
@@ -219,6 +244,7 @@ export function VerseBrowser() {
     if (phase === 'book') {
       if (searchBook.current) {
         searchPhase.current = 'chapter'
+        setGhost('')
         setInput(`${searchBook.current} `)
       }
       return
@@ -239,6 +265,7 @@ export function VerseBrowser() {
           })
           .catch(() => {})
         searchPhase.current = 'verse'
+        setGhost('')
         setInput(`${searchBook.current} ${searchChapter.current}:`)
       }
       return
@@ -265,15 +292,16 @@ export function VerseBrowser() {
       const phase = searchPhase.current
       if (phase === 'verse' && !searchVerse.current && searchChapter.current) {
         searchPhase.current = 'chapter'
+        setGhost('')
         setInput(`${searchBook.current} ${searchChapter.current}`)
         return
       }
       if (phase === 'chapter' && !searchChapter.current && searchBook.current) {
         searchPhase.current = 'book'
+        setGhost('')
         setInput(searchBook.current)
         return
       }
-      deleting.current = true
     }
   }
 
@@ -281,35 +309,22 @@ export function VerseBrowser() {
     if (suppressSet.current) return
     const phase = searchPhase.current
     if (phase === 'book') {
+      // Non-destructive: keep the operator's letters verbatim, derive only the
+      // ghost suggestion from the best prefix match. Failing to match keeps the
+      // typed text in the box so nothing is ever silently discarded.
       const letters = value.replace(/[^a-zA-Z0-9\s]/g, '').trim()
       if (!letters) {
         searchBook.current = ''
+        setGhost('')
+        setInput('')
         return
       }
       const book = findBook(letters)
-      if (!book) {
-        const prev = searchBook.current || ''
-        setInput(prev)
-        if (prev && letters.length > 1) {
-          pendingSel.current = {
-            from: Math.min(letters.length - 1, prev.length),
-            to: prev.length,
-          }
-        }
-        return
-      }
-      searchBook.current = book.name
-      if (deleting.current) {
-        deleting.current = false
-        setInput(value)
-        return
-      }
-      const completed = book.name.slice(letters.length)
-      setInput(book.name)
-      pendingSel.current = {
-        from: completed ? letters.length : book.name.length,
-        to: book.name.length,
-      }
+      searchBook.current = book?.name ?? ''
+      setGhost(
+        book && letters.length < book.name.length ? book.name.slice(letters.length) : '',
+      )
+      setInput(letters)
       return
     }
     if (phase === 'chapter') {
@@ -356,6 +371,20 @@ export function VerseBrowser() {
     setStaged(verseSlide(ref, text), null)
   }
 
+  function goLiveForCard(v: StageVerse) {
+    if (tab === 'context') {
+      const m = String(v.ref).trim().match(/^(.+?)\s+(\d+):(\d+)/)
+      if (m) {
+        void stageAndOpenRef(m[1], Number(m[2]), Number(m[3])).then(() => {
+          goLive()
+        })
+      }
+      return
+    }
+    setStaged(verseSlide(v.ref, v.text), null)
+    goLive()
+  }
+
   function addVerse(ref: string, text: string) {
     if (animRef === ref) return
     addToSchedule(verseSlide(ref, text), tab === 'context' ? 'Context search' : 'Manual')
@@ -376,7 +405,7 @@ export function VerseBrowser() {
     setContextQuery(value)
     if (ctxTimer.current) window.clearTimeout(ctxTimer.current)
     ctxTimer.current = window.setTimeout(() => {
-      if (value.trim()) runContextSearch()
+      runContextSearch()
     }, 180)
   }
 
@@ -396,15 +425,27 @@ export function VerseBrowser() {
           Context search
         </button>
         <div className="res-field" hidden={tab !== 'book'}>
+          {refInput.trim() !== '' && ghost !== '' && (
+            <div className="res-input-ghost" ref={ghostEl} aria-hidden="true">
+              <span>{refInput}</span>
+              <span className="ghost-rest">{ghost}</span>
+            </div>
+          )}
           <input
-            className="res-input"
+            className={`res-input${ghost !== '' ? ' ghost-mode' : ''}`}
             ref={refEl}
             value={refInput}
             aria-label="Reference"
             autoComplete="off"
             placeholder="Reference only — e.g. John 3:16"
+            spellCheck={false}
             onKeyDown={onRefKey}
             onChange={(e) => onRefChange(e.target.value)}
+            onScroll={(e) => {
+              if (ghostEl.current) {
+                ghostEl.current.style.textIndent = `${-e.currentTarget.scrollLeft}px`
+              }
+            }}
           />
         </div>
         <div className="res-field has-icon" hidden={tab !== 'context'}>
@@ -428,24 +469,52 @@ export function VerseBrowser() {
             onChange={(e) => onCtxChange(e.target.value)}
           />
         </div>
-        <div className="res-select-wrap" title="Translation" hidden={tab !== 'book'}>
-          <select
-            className="res-select"
+        <div
+          className="res-select-wrap dropdown-wrap"
+          title="Translation"
+          hidden={tab !== 'book'}
+          ref={transWrap}
+        >
+          <button
+            type="button"
+            className="res-select-drop"
             aria-label="Translation"
-            value={currentTranslation}
-            onChange={(e) => switchTranslation(e.target.value)}
+            aria-haspopup="listbox"
+            aria-expanded={transOpen}
+            onClick={() => setTransOpen((o) => !o)}
           >
-            {(translations.length > 0 ? translations : [{ id: currentTranslation, name: currentTranslation }]).map(
-              (t) => (
-                <option key={t.id} value={t.id}>
+            <span className="res-select-label">
+              {currentTranslation && translations.length > 0
+                ? translations.find((t) => t.id === currentTranslation)?.name ??
+                  currentTranslation
+                : currentTranslation}
+            </span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {transOpen && (
+            <div className="res-select-menu" role="listbox" aria-label="Translation">
+              {(translations.length > 0
+                ? translations
+                : [{ id: currentTranslation, name: currentTranslation }]
+              ).map((t) => (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={t.id === currentTranslation}
+                  className={`res-select-opt${t.id === currentTranslation ? ' on' : ''}`}
+                  key={t.id}
+                  onClick={() => {
+                    switchTranslation(t.id)
+                    setTransOpen(false)
+                  }}
+                >
                   {t.name}
-                </option>
-              )
-            )}
-          </select>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="res-book">{heading}</div>
         <button
@@ -485,8 +554,12 @@ export function VerseBrowser() {
                 type="button"
                 key={v.ref}
                 className={`verse-card${isStaged && !isLive ? ' staged-preview' : ''}${isLive ? ' live' : ''}${picked ? ' picked' : ''}${anim ? ' add-flash' : ''}`}
-                title="Click to preview · Shift-click to stack verses"
+                title="Click to preview · double-click to go live · Shift-click to stack verses"
                 onClick={(e) => handleCard(v.ref, v.text, e)}
+                onDoubleClick={(e) => {
+                  if ((e.target as HTMLElement).closest('.verse-add')) return
+                  goLiveForCard(v)
+                }}
               >
                 <div className="verse-card-top">
                   <div className="verse-num">

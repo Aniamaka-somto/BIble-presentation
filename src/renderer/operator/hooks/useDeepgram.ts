@@ -58,6 +58,7 @@ export function useDeepgram() {
   const timerRef = useRef<number | null>(null)
   const utteranceRef = useRef<string>('')
   const scoutTimerRef = useRef<number | null>(null)
+  const chunkRef = useRef(0)
 
   const stop = useCallback(() => {
     if (timerRef.current !== null) {
@@ -141,12 +142,13 @@ export function useDeepgram() {
 
       const store = useOperator.getState()
       if (!data.is_final) {
-        store.updateInterim(transcript)
+        store.updateInterim(transcript, chunkRef.current)
         return
       }
 
-      store.updateInterim('')
-      commitFinal(store, transcript)
+      store.updateInterim('', chunkRef.current)
+      commitFinal(store, transcript, chunkRef.current)
+      if (data.speech_final) chunkRef.current += 1
       utteranceRef.current = mergeFinalText(utteranceRef.current, transcript)
       const combined = utteranceRef.current
 
@@ -280,11 +282,13 @@ export function useDeepgram() {
 
 function commitFinal(
   store: ReturnType<typeof useOperator.getState>,
-  text: string
+  text: string,
+  chunk: number
 ) {
   const refs = parseExplicitReferences(text)
   store.commitTranscriptFinal(
     text.trim(),
-    refs.map((r) => ({ book: r.book, matchedText: r.matchedText }))
+    refs.map((r) => ({ book: r.book, matchedText: r.matchedText })),
+    chunk
   )
 }

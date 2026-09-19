@@ -20,6 +20,7 @@ import {
   type BackgroundItem,
   type BackgroundSource,
   type LiveSlidePush,
+  type SettingsPage,
 } from "../shared/types";
 import {
   getChapter,
@@ -43,11 +44,14 @@ import {
   semanticSearch,
   semanticSearchAll,
   ensureSemanticReady,
+  warmSemanticIndexes,
   type SemanticProgress,
 } from "../lib/semantic";
+import { exactSearch } from "../lib/semantic/exact";
 
 let operatorWindow: BrowserWindow | null = null;
 let outputWindow: BrowserWindow | null = null;
+let settingsWindow: BrowserWindow | null = null;
 let sleepBlockerId: number | null = null;
 const backgroundsDir = join(app.getPath("userData"), "backgrounds");
 const metaPath = join(backgroundsDir, "meta.json");
@@ -65,7 +69,9 @@ const outputState: OutputState = {
 function createOperatorWindow() {
   operatorWindow = new BrowserWindow({
     width: 1280,
-    height: 800,
+    height: 720,
+    minWidth: 1152,
+    minHeight: 648,
     title: "Scripture Caster — Operator Console",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -86,6 +92,10 @@ function createOperatorWindow() {
     if (outputWindow) {
       outputWindow.destroy();
       outputWindow = null;
+    }
+    if (settingsWindow) {
+      settingsWindow.destroy();
+      settingsWindow = null;
     }
   });
 
@@ -140,6 +150,55 @@ function createOutputWindow() {
   } else {
     outputWindow.loadFile(join(__dirname, "../renderer/output/index.html"));
   }
+}
+
+// ---- Settings screens (Display settings / Output routing / Settings) ----
+// Each of the three TopBar buttons opens its OWN blocking modal window on top
+// of the operator console. Only screens + navigation for now: the controls
+// hold local state; real wiring comes later.
+const SETTINGS_TITLES: Record<SettingsPage, string> = {
+  display: "Display Settings",
+  output: "Output Routing",
+  settings: "Settings",
+};
+
+function createSettingsWindow(page: SettingsPage) {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.close();
+    settingsWindow = null;
+  }
+  settingsWindow = new BrowserWindow({
+    width: 980,
+    height: 720,
+    minWidth: 860,
+    minHeight: 600,
+    parent: operatorWindow && !operatorWindow.isDestroyed() ? operatorWindow : undefined,
+    modal: true,
+    show: false,
+    autoHideMenuBar: true,
+    backgroundColor: "#0d111b",
+    title: `Scripture Caster — ${SETTINGS_TITLES[page]}`,
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  if (process.env.ELECTRON_RENDERER_URL) {
+    settingsWindow.loadURL(
+      `${process.env.ELECTRON_RENDERER_URL}/settings/index.html?page=${page}`,
+    );
+  } else {
+    settingsWindow.loadFile(join(__dirname, "../renderer/settings/index.html"), {
+      query: { page },
+    });
+  }
+  settingsWindow.once("ready-to-show", () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.show();
+  });
+  settingsWindow.on("closed", () => {
+    settingsWindow = null;
+  });
 }
 // ---- Background helpers ----
 async function ensureBackgroundsDir() {
@@ -255,6 +314,11 @@ app.whenReady().then(async () => {
       );
       outputWindow.show();
     }
+  });
+
+  // ---- Settings screens IPC ----
+  ipcMain.handle(IPC.OPEN_SETTINGS_PAGE, (_event, page: SettingsPage) => {
+    createSettingsWindow(page);
   });
 
   // ---- Verse / blank IPC (unchanged) ----
@@ -376,25 +440,46 @@ app.whenReady().then(async () => {
   const fallbackParaphrase = (query: string, translation?: string) =>
     paraphraseSearch(query, 5, 0.7, translation);
 
+  // Short utterances are the ambiguous ones; raise the semantic bar so a good
+  // paraphrase has to actually resemble the quote instead of any loose match.
+  const thresholdFor = (query: string) => {
+    const words = query.trim().split(/\s+/).filter(Boolean).length;
+    return words > 0 && words < 8 ? 0.6 : 0.5;
+  };
+
   ipcMain.handle(IPC.BIBLE_PARAPHRASE_SEARCH, async (_event, query: string, translation?: string) => {
+    const t = (translation || "KJV") as string;
     try {
-      const matches = await semanticSearch(query, 8, 0.5, translation);
-      if (matches.length > 0) return matches;
-      return fallbackParaphrase(query, translation);
+      const exact = exactSearch(query, [t], t, 4);
+      if (exact.length > 0) return exact;
     } catch {
-      return fallbackParaphrase(query, translation);
+      // fall through to semantic
+    }
+    try {
+      const matches = await semanticSearch(query, 8, thresholdFor(query), t);
+      if (matches.length > 0) return matches;
+      return fallbackParaphrase(query, t);
+    } catch {
+      return fallbackParaphrase(query, t);
     }
   });
 
   ipcMain.handle(
     IPC.BIBLE_PARAPHRASE_SEARCH_ALL,
-    async (_event, query: string, translations: string[]) => {
+    async (_event, query: string, translations: string[], preferred?: string) => {
       const ids =
         translations && translations.length > 0
           ? translations
           : listTranslations().map((t) => t.id);
+      const pref = (preferred || ids[0] || "KJV") as string;
       try {
-        const matches = await semanticSearchAll(query, ids, 8, 0.5);
+        const exact = exactSearch(query, ids, pref, 4);
+        if (exact.length > 0) return exact;
+      } catch {
+        // fall through to semantic
+      }
+      try {
+        const matches = await semanticSearchAll(query, ids, 8, thresholdFor(query), pref);
         if (matches.length > 0) return matches;
       } catch {
         // fall through to token matcher
@@ -410,10 +495,13 @@ app.whenReady().then(async () => {
     },
   );
 
-  // Prewarm the semantic model so indexing starts before the first quote.
-  ensureSemanticReady().catch((err) => {
-    console.error("Semantic model warmup failed:", err);
-  });
+  // Prewarm the semantic model and the scored translation indexes so the first
+  // quote is fast instead of paying the load cost mid-sermon.
+  ensureSemanticReady()
+    .then(() => warmSemanticIndexes(["KJV", "NKJV", "AMP"]))
+    .catch((err) => {
+      console.error("Semantic model warmup failed:", err);
+    });
 
   ipcMain.handle(IPC.GET_DESKTOP_AUDIO_SOURCE, async () => {
     const sources = await desktopCapturer.getSources({

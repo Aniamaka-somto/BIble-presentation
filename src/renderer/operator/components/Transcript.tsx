@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useOperator } from '../store'
 import { useDeepgram } from '../hooks/useDeepgram'
 import { normalizeNumbers } from '../../../lib/detection/numbers'
+import type { TranscriptLine } from '../types'
 
 interface LineRef {
   book: string
@@ -70,7 +71,24 @@ export function Transcript() {
   const clearTranscript = useOperator((s) => s.clearTranscript)
   const { status, toggle } = useDeepgram()
 
+  const bodyRef = useRef<HTMLDivElement>(null)
+
   const listening = status === 'listening' || status === 'reconnecting'
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lines])
+
+  const groups = useMemo(() => {
+    const out: Array<{ chunk: number; lines: TranscriptLine[] }> = []
+    for (const line of lines) {
+      const g = out[out.length - 1]
+      if (g && g.chunk === line.chunk) g.lines.push(line)
+      else out.push({ chunk: line.chunk, lines: [line] })
+    }
+    return out
+  }, [lines])
 
   return (
     <section className="transcript">
@@ -91,17 +109,21 @@ export function Transcript() {
           </button>
         </div>
       </div>
-      <div className="tr-body">
+      <div className="tr-body" ref={bodyRef}>
         {lines.length === 0 && (
           <p className="tr-empty">
             Start transcribing to see what is being said. Scripture references heard
             here are sent to Detections.
           </p>
         )}
-        {lines.map((line) => (
-          <p key={line.id} className={`tr-line${line.final ? '' : ' interim'}`}>
-            <TranscriptText text={line.text} refs={line.refs} />
-          </p>
+        {groups.map((g) => (
+          <div className="tr-chunk" key={g.chunk}>
+            {g.lines.map((line) => (
+              <p key={line.id} className={`tr-line${line.final ? '' : ' interim'}`}>
+                <TranscriptText text={line.text} refs={line.refs} />
+              </p>
+            ))}
+          </div>
         ))}
       </div>
       <div className="tr-foot">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useOperator } from '../store'
 import { DisplayIcon, RoutingIcon, SettingsIcon } from './icons'
+import type { SettingsPage } from '../../../shared/types'
 
 function useClock(): string {
   const [now, setNow] = useState(() => new Date())
@@ -31,13 +32,25 @@ export function TopBar() {
         <div className="tally-time">{clock}</div>
       </div>
       <div className="topbar-controls">
-        <button className="deck-btn" title="Display settings">
+        <button
+          className="deck-btn"
+          title="Display settings"
+          onClick={() => window.scriptureCaster.openSettingsPage('display' as SettingsPage)}
+        >
           <DisplayIcon />
         </button>
-        <button className="deck-btn" title="Output routing">
+        <button
+          className="deck-btn"
+          title="Output routing"
+          onClick={() => window.scriptureCaster.openSettingsPage('output' as SettingsPage)}
+        >
           <RoutingIcon />
         </button>
-        <button className="deck-btn" title="Settings">
+        <button
+          className="deck-btn"
+          title="Settings"
+          onClick={() => window.scriptureCaster.openSettingsPage('settings' as SettingsPage)}
+        >
           <SettingsIcon />
         </button>
       </div>

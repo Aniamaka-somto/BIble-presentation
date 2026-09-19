@@ -29,6 +29,12 @@ const QUANTIZED = true;
 const BATCH = 128;
 const DIM = 384;
 
+// Translations that get full dot-product scoring on every search. Everything
+// else is resolved by verse-key text lookup, so the full set of translations
+// still appears in results without the 21x scan that caused the UI freeze.
+export const SEARCH_PRIORITY = ["KJV", "NKJV", "AMP"];
+const MAX_SCORED = 4;
+
 let baseCacheDir = "";
 let modelDir = "";
 let bundledIndexDir = "";
@@ -65,8 +71,10 @@ function loadTx(): Promise<Tx> {
 interface LoadedIndex {
   sourceStamp: string;
   verses: BibleVerse[];
-  vectors: Float32Array;
+  vectors?: Float32Array;
   buffer?: Buffer;
+  int8?: Int8Array;
+  scales?: Float32Array;
 }
 
 const indexCache = new Map<string, LoadedIndex>();
@@ -191,16 +199,11 @@ function loadBundledIndex(
   }
   const buf = fs.readFileSync(bin);
   if (buf.length < parsed.count * (4 + DIM)) return null;
-  const vectors = new Float32Array(parsed.count * DIM);
-  for (let i = 0; i < parsed.count; i++) {
-    const scale = buf.readFloatLE(i * 4);
-    const off = i * DIM;
-    const base = parsed.count * 4 + off;
-    for (let j = 0; j < DIM; j++) {
-      vectors[off + j] = buf.readInt8(base + j) * scale;
-    }
-  }
-  return { sourceStamp: BUNDLED_STAMP, verses, vectors };
+  // Zero-copy: view the int8 data and its per-verse f32 scale without
+  // dequantizing to a full Float32Array (48MB saved per translation).
+  const int8 = new Int8Array(buf.buffer, buf.byteOffset + parsed.count * 4, parsed.count * DIM);
+  const scales = new Float32Array(buf.buffer, buf.byteOffset, parsed.count);
+  return { sourceStamp: BUNDLED_STAMP, verses, int8, scales };
 }
 
 function loadIndexFromDisk(
@@ -293,15 +296,7 @@ async function ensureIndex(
   options: { allowBuild?: boolean } = {},
 ): Promise<LoadedIndex | null> {
   const existing = indexCache.get(translation);
-  if (existing) {
-    const currentStamp = getTranslationStamp(translation);
-    if (
-      existing.sourceStamp === BUNDLED_STAMP ||
-      existing.sourceStamp === currentStamp
-    ) {
-      return existing;
-    }
-  }
+  if (existing) return existing;
 
   const verses = getAllVerses(translation);
   const bundled = loadBundledIndex(translation, verses);
@@ -342,6 +337,44 @@ export async function ensureSemanticReady(): Promise<void> {
   await ensureModel();
 }
 
+export async function warmSemanticIndexes(translations: string[]): Promise<void> {
+  for (const translation of translations) {
+    await ensureIndex(translation);
+  }
+}
+
+// Dot product of query q against verse i. Handles both Float32 vectors
+// (self-built / on-disk f32) and zero-copy int8 + per-verse scale (bundled).
+function rowDot(index: LoadedIndex, i: number, q: Float32Array): number {
+  const off = i * DIM;
+  if (index.vectors) {
+    const vec = index.vectors;
+    let dot = 0;
+    for (let j = 0; j < DIM; j++) dot += q[j] * vec[off + j];
+    return dot;
+  }
+  const int8 = index.int8!;
+  const scale = index.scales![i];
+  let dot = 0;
+  for (let j = 0; j < DIM; j++) dot += q[j] * int8[off + j];
+  return dot * scale;
+}
+
+// Cached verse-key -> text maps used to fill in translations that aren't
+// dot-product scored (avoids re-reading the bible data on every search).
+const textMapCache = new Map<string, Map<string, BibleVerse>>();
+function getTextMap(translation: string): Map<string, BibleVerse> {
+  let m = textMapCache.get(translation);
+  if (!m) {
+    m = new Map();
+    for (const v of getAllVerses(translation)) {
+      m.set(`${v.book}|${v.chapter}|${v.verse}`, v);
+    }
+    textMapCache.set(translation, m);
+  }
+  return m;
+}
+
 export async function semanticSearch(
   query: string,
   limit = 8,
@@ -358,9 +391,7 @@ export async function semanticSearch(
   const results: ParaphraseMatch[] = [];
   const n = index.verses.length;
   for (let i = 0; i < n; i++) {
-    const off = i * DIM;
-    let dot = 0;
-    for (let j = 0; j < DIM; j++) dot += q[j] * index.vectors[off + j];
+    const dot = rowDot(index, i, q);
     if (dot >= threshold) {
       const v = index.verses[i];
       results.push({ ...v, score: Math.round(dot * 10000) / 10000 });
@@ -371,29 +402,36 @@ export async function semanticSearch(
 }
 
 /**
- * Embed the query exactly once, then score it against every translation index
- * in a single pass. Avoids N redundant forward passes and concurrent
- * session.run() on the shared onnxruntime pipeline.
+ * Embed the query exactly once, then score it against a small set of
+ * translations (preferred + canonical fallbacks) in a single pass, resolving
+ * the other requested translations by verse-key text lookup. This keeps every
+ * translation in the results without the full 21x scan that froze the UI.
  */
 export async function semanticSearchAll(
   query: string,
   translations: string[],
   limit = 8,
   threshold = 0.5,
+  preferred = "KJV",
 ): Promise<(ParaphraseMatch & { translation: string })[]> {
+  if (translations.length === 0) return [];
   const pipe = await ensureModel();
   const out = await pipe(query, { pooling: "mean", normalize: true });
   const q = out.data as Float32Array;
 
+  const scored: string[] = [];
+  for (const t of [preferred, ...SEARCH_PRIORITY, ...translations]) {
+    if (t && !scored.includes(t)) scored.push(t);
+  }
+  if (scored.length > MAX_SCORED) scored.length = MAX_SCORED;
+
   const results: (ParaphraseMatch & { translation: string })[] = [];
-  for (const translation of translations) {
+  for (const translation of scored) {
     const index = await ensureIndex(translation);
     if (!index) continue;
     const n = index.verses.length;
     for (let i = 0; i < n; i++) {
-      const off = i * DIM;
-      let dot = 0;
-      for (let j = 0; j < DIM; j++) dot += q[j] * index.vectors[off + j];
+      const dot = rowDot(index, i, q);
       if (dot >= threshold) {
         const v = index.verses[i];
         results.push({ ...v, score: Math.round(dot * 10000) / 10000, translation });
@@ -401,5 +439,17 @@ export async function semanticSearchAll(
     }
   }
   results.sort((a, b) => b.score - a.score);
-  return results.slice(0, limit);
+  const top = results.slice(0, limit);
+
+  const scoredSet = new Set(scored);
+  const filled: (ParaphraseMatch & { translation: string })[] = [...top];
+  for (const m of top) {
+    const key = `${m.book}|${m.chapter}|${m.verse}`;
+    for (const t of translations) {
+      if (scoredSet.has(t)) continue;
+      const v = getTextMap(t).get(key);
+      if (v) filled.push({ ...m, text: v.text, translation: t });
+    }
+  }
+  return filled;
 }

@@ -33,6 +33,7 @@ export interface TranscriptLine {
   text: string
   final: boolean
   refs: { book: string; matchedText: string }[]
+  chunk: number
 }
 
 export interface DetectionCard {

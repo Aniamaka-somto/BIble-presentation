@@ -104,6 +104,9 @@ export interface BookRef {
 
 export type SemanticPhase = 'idle' | 'download' | 'indexing' | 'ready' | 'error'
 
+// The three blocking settings screens opened from the operator's top bar.
+export type SettingsPage = 'display' | 'output' | 'settings'
+
 export interface SemanticProgress {
   phase: SemanticPhase
   translation?: string
@@ -128,7 +131,7 @@ export interface ScriptureCasterApi {
   getBookList(translation?: string): Promise<BookRef[]>
   getVerseCount(book: string, chapter: number, translation?: string): Promise<number | null>
   paraphraseSearch(query: string, translation?: string): Promise<ParaphraseMatchRef[]>
-  paraphraseSearchAll(query: string, translations: string[]): Promise<ParaphraseMatchRef[]>
+  paraphraseSearchAll(query: string, translations: string[], preferred?: string): Promise<ParaphraseMatchRef[]>
   getDesktopAudioSource(): Promise<{ id: string; name: string } | null>
   toggleOutputVisibility(): void
   sendAlert(message: string): void
@@ -138,6 +141,7 @@ export interface ScriptureCasterApi {
   onOutputStateChanged(cb: (state: OutputState) => void): () => void
   onAlert(cb: (message: string) => void): () => void
   onSemanticProgress(cb: (progress: SemanticProgress) => void): () => void
+  openSettingsPage(page: SettingsPage): Promise<void>
 }
 
 export const IPC = {
@@ -167,4 +171,5 @@ export const IPC = {
   TRANSLATION_SELECT: 'translation:select',
   BIBLE_GET_VERSE_COUNT: 'bible:get-verse-count',
   SEMANTIC_PROGRESS: 'semantic:progress',
+  OPEN_SETTINGS_PAGE: 'settings:open-page',
 } as const

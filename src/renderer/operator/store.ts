@@ -89,7 +89,7 @@ interface OperatorState {
   setContextQuery: (q: string) => void
   runContextSearch: () => Promise<void>
 
-  addToSchedule: (slide: Slide, src: string) => void
+  addToSchedule: (slide: Slide, src: string) => boolean
   removeFromSchedule: (id: string) => void
   clearSchedule: () => void
   setStaged: (slide: Slide, entryId?: string | null) => void
@@ -114,8 +114,8 @@ interface OperatorState {
 
   setListeningStatus: (status: ListeningStatus) => void
   setReconnectAttempts: (n: number) => void
-  commitTranscriptFinal: (text: string, refs: { book: string; matchedText: string }[]) => void
-  updateInterim: (text: string) => void
+  commitTranscriptFinal: (text: string, refs: { book: string; matchedText: string }[], chunk: number) => void
+  updateInterim: (text: string, chunk: number) => void
   clearTranscript: () => void
 
   setAlertsOpen: (open: boolean) => void
@@ -214,9 +214,22 @@ export const useOperator = create<OperatorState>((set, get) => ({
 
   switchTranslation: async (id: string) => {
     if (get().currentTranslation === id) return
+    const prev = get().staged
+    const prevEntry = get().stagedEntryId
     set({ currentTranslation: id })
     const { lastChapter } = get()
     if (lastChapter) await get().loadChapter(lastChapter.book, lastChapter.chapter, id)
+    const s = get()
+    if (!prev) return
+    const refs = (prev.refs ?? []).filter(Boolean)
+    if (refs.length !== 1) return
+    const m = refs[0].match(/^(.+?)\s+(\d+):(\d+)/)
+    if (!m) return
+    const vs = Number(m[3])
+    const target = Object.values(s.verseData).find(
+      (x) => x.n <= vs && vs <= (x.endVerse ?? x.n)
+    )
+    if (target) s.setStaged(verseSlide(target.ref, target.text), prevEntry)
   },
 
   loadChapter: async (book, chapter, translation) => {
@@ -355,11 +368,14 @@ export const useOperator = create<OperatorState>((set, get) => ({
   runContextSearch: async () => {
     const { contextQuery, currentTranslation } = get()
     const query = contextQuery.trim()
-    if (!query) return
+    if (!query) {
+      set({ contextResults: [], picks: [] })
+      return
+    }
     const [lex, sem] = await Promise.all([
       api.searchVerses(query, currentTranslation).catch(() => []),
       api
-        .paraphraseSearchAll(query, get().translations.map((tl) => tl.id))
+        .paraphraseSearchAll(query, get().translations.map((tl) => tl.id), currentTranslation)
         .catch(() => []),
     ])
     const results: ContextResult[] = []
@@ -381,16 +397,16 @@ export const useOperator = create<OperatorState>((set, get) => ({
   },
 
   addToSchedule: (slide, src) => {
+    const s = get()
+    if (s.schedule.some((e) => slideRefKey(e.slide) === slideRefKey(slide))) return false
     orderSeq++
     const entry: ScheduleEntry = { id: nextId(), slide, src, order: orderSeq }
     const refs = slide.refs.filter(Boolean)
-    set((s) => ({
-      schedule: [entry, ...s.schedule],
-      scheduledRefs: [...new Set([...s.scheduledRefs, ...refs])],
-      staged: slide,
-      stagedEntryId: entry.id,
-      stagedFit: null,
+    set((st) => ({
+      schedule: [entry, ...st.schedule],
+      scheduledRefs: [...new Set([...st.scheduledRefs, ...refs])],
     }))
+    return true
   },
 
   removeFromSchedule: (id) => {
@@ -541,32 +557,33 @@ export const useOperator = create<OperatorState>((set, get) => ({
   setListeningStatus: (listeningStatus) => set({ listeningStatus }),
   setReconnectAttempts: (reconnectAttempts) => set({ reconnectAttempts }),
 
-  commitTranscriptFinal: (text, refs) => {
+  commitTranscriptFinal: (text, refs, chunk) => {
     set((s) => {
       const lines = [...s.transcriptLines]
       const last = lines[lines.length - 1]
       if (last && !last.final) {
-        lines[lines.length - 1] = { ...last, text: text.trim(), final: true, refs }
+        lines[lines.length - 1] = { ...last, text: text.trim(), final: true, refs, chunk }
       } else {
         lines.push({
           id: nextId(),
           text: text.trim(),
           final: true,
           refs,
+          chunk,
         })
       }
       return { transcriptLines: lines.slice(-MAX_TRANSCRIPT_LINES) }
     })
   },
 
-  updateInterim: (text) => {
+  updateInterim: (text, chunk) => {
     set((s) => {
       const lines = [...s.transcriptLines]
       const last = lines[lines.length - 1]
       if (last && !last.final) {
-        lines[lines.length - 1] = { ...last, text }
+        lines[lines.length - 1] = { ...last, text, chunk }
       } else {
-        lines.push({ id: nextId(), text, final: false, refs: [] })
+        lines.push({ id: nextId(), text, final: false, refs: [], chunk })
       }
       return { transcriptLines: lines.slice(-MAX_TRANSCRIPT_LINES) }
     })
