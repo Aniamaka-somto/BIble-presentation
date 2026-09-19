@@ -1,96 +1,46 @@
+import { useEffect, useState } from 'react'
 import { useOperator } from '../store'
-import { AlertIcon, FolderIcon, PlusIcon } from './icons'
+import { DisplayIcon, RoutingIcon, SettingsIcon } from './icons'
+
+function useClock(): string {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const ss = String(now.getSeconds()).padStart(2, '0')
+  return `${hh}:${mm}:${ss}`
+}
 
 export function TopBar() {
-  const outputMode = useOperator((s) => s.outputMode)
-  const setOutputMode = useOperator((s) => s.setOutputMode)
-  const blankMode = useOperator((s) => s.blankMode)
-  const clearOn = useOperator((s) => s.clearOn)
-  const outputVisible = useOperator((s) => s.outputVisible)
-  const toggleBlank = useOperator((s) => s.toggleBlank)
-  const toggleClear = useOperator((s) => s.toggleClear)
-  const toggleOutputVisibility = useOperator((s) => s.toggleOutputVisibility)
-  const setAlertsOpen = useOperator((s) => s.setAlertsOpen)
+  const isLive = useOperator((s) => s.isLive)
+  const clock = useClock()
 
   return (
-    <div className="topbar">
-      <div className="tb-cluster">
-        <div className="tb-icon" title="New schedule">
-          <PlusIcon />
-        </div>
-        <div className="tb-icon" title="Open schedule">
-          <FolderIcon />
-        </div>
-        <div className="tb-divider"></div>
-        <div className="app-title">
-          Scripture Caster <span>· Sunday Service</span>
-        </div>
+    <header className="topbar">
+      <div className="brand">
+        <div className="brand-mark">SC</div>
+        <div className="brand-name">ScriptureCaster</div>
+        <div className="brand-sub">OPERATOR CONSOLE</div>
       </div>
-
-      <div className="tb-cluster">
-        <span
-          style={{
-            fontSize: '11px',
-            color: 'var(--text-lo)',
-            fontWeight: 600,
-            letterSpacing: '0.4px',
-          }}
-        >
-          OUTPUT
-        </span>
-        <div className="segmented-sm">
-          <button
-            className={outputMode === 'combined' ? 'on' : ''}
-            onClick={() => setOutputMode('combined')}
-          >
-            Combined
-          </button>
-          <button
-            className={outputMode === 'split' ? 'on' : ''}
-            onClick={() => setOutputMode('split')}
-          >
-            Split screens
-          </button>
-        </div>
-        <div className="tb-divider"></div>
-        <div className="session-chip">
-          <div className="dot-pulse"></div>
-          34:12
-        </div>
+      <div className={`tally-cluster${isLive ? ' live' : ''}`}>
+        <div className="tally-dot" />
+        <div className="tally-label">{isLive ? 'ON AIR' : 'STANDBY'}</div>
+        <div className="tally-time">{clock}</div>
       </div>
-
-      <div className="tb-cluster">
-        <div className="alerts-btn" onClick={() => setAlertsOpen(true)}>
-          <AlertIcon />
-          Alerts
-        </div>
-        <div className="lbc-cluster">
-          <div
-            className={'lbc-btn' + (blankMode === 'logo' ? ' active' : '')}
-            onClick={() => toggleBlank('logo')}
-          >
-            LOGO
-          </div>
-          <div
-            className={'lbc-btn' + (blankMode === 'black' ? ' active' : '')}
-            onClick={() => toggleBlank('black')}
-          >
-            BLACK
-          </div>
-          <div className={'lbc-btn' + (clearOn ? ' active' : '')} onClick={toggleClear}>
-            CLEAR
-          </div>
-        </div>
-        <div className="tb-divider"></div>
-        <button
-          type="button"
-          className={'live-pill' + (outputVisible ? '' : ' off')}
-          onClick={toggleOutputVisibility}
-        >
-          <div className="rdot"></div>
-          <span>{outputVisible ? 'ON AIR' : 'OFF AIR'}</span>
+      <div className="topbar-controls">
+        <button className="deck-btn" title="Display settings">
+          <DisplayIcon />
+        </button>
+        <button className="deck-btn" title="Output routing">
+          <RoutingIcon />
+        </button>
+        <button className="deck-btn" title="Settings">
+          <SettingsIcon />
         </button>
       </div>
-    </div>
+    </header>
   )
 }

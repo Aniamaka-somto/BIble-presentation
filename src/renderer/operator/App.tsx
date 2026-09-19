@@ -2,40 +2,44 @@ import { useEffect } from 'react'
 import { useOperator } from './store'
 import { TopBar } from './components/TopBar'
 import { ScheduleList } from './components/ScheduleList'
-import { ResourceLibrary } from './components/ResourceLibrary'
-import { Stage } from './components/Stage'
-import { Filmstrip } from './components/Filmstrip'
-import { TranscriptBar } from './components/TranscriptBar'
-import { Assistant } from './components/Assistant'
-import { AlertsModal } from './components/AlertsModal'
+import { PreviewArea } from './components/PreviewArea'
+import { Transcript } from './components/Transcript'
+import { VerseBrowser } from './components/VerseBrowser'
+import { RightColumn } from './components/RightColumn'
 import { DgKeyModal } from './components/DgKeyModal'
 
 export default function App() {
-  const outputMode = useOperator((s) => s.outputMode)
+  const dgKeyOpen = useOperator((s) => s.dgKeyOpen)
 
   useEffect(() => {
     const state = useOperator.getState()
     state.loadTranslations()
-    state.loadChapter('Luke', 1, 17, state.currentTranslation)
+    state.loadChapter('Genesis', 1).then(() => {
+      const v = useOperator.getState().verseData[3]
+      if (v) useOperator.getState().addToSchedule(
+        { label: v.ref, refs: [v.ref], blocks: [{ ref: v.ref, parts: [{ text: v.text }] }], theme: 'default', layout: 'single' },
+        'Manual'
+      )
+    })
   }, [])
 
   return (
-    <>
-      <div className={'app' + (outputMode === 'split' ? ' split-mode' : '')}>
-        <TopBar />
-        <div className="left-col">
+    <div className="app">
+      <TopBar />
+      <main className="main">
+        <div className="col col-left">
           <ScheduleList />
-          <ResourceLibrary />
         </div>
-        <div className="center-col">
-          <Stage />
-          <Filmstrip />
-          <TranscriptBar />
+        <div className="preview-area">
+          <PreviewArea />
         </div>
-        <Assistant />
-      </div>
-      <AlertsModal />
-      <DgKeyModal />
-    </>
+        <Transcript />
+        <VerseBrowser />
+        <div className="col col-right">
+          <RightColumn />
+        </div>
+      </main>
+      {dgKeyOpen && <DgKeyModal />}
+    </div>
   )
 }

@@ -35,9 +35,47 @@ export interface BackgroundItem {
   addedAt: number
 }
 
+// A slide is a declarative scene: one or more text blocks, each with its own
+// reference. Rendered on a fixed 1920x1080 canvas, auto-fitted once, then
+// scaled to whatever box displays it (operator preview, operator live monitor,
+// projector window). The main process only ever carries this state — never
+// pixels or HTML.
+export type SlideTheme = 'default' // single theme for now, carried for the future
+export type SlideLayout = 'single' // single layout for now, carried for the future
+
+export interface SlidePart {
+  text: string
+  num?: number
+}
+
+export interface SlideBlock {
+  ref: string
+  parts: SlidePart[]
+}
+
+export interface Slide {
+  label: string
+  refs: string[]
+  blocks: SlideBlock[]
+  theme?: SlideTheme
+  layout?: SlideLayout
+}
+
+// Payload pushed to the output window. fontSize is the operator's authoritative
+// auto-fit size (canvas px), so every display is pixel-identical.
+export interface LiveSlidePush {
+  slide: Slide
+  theme: SlideTheme
+  layout: SlideLayout
+  fontSize: number | null
+}
+
 export interface OutputState {
   live: boolean
-  verse: VerseMatch | null
+  slide: Slide | null
+  theme: SlideTheme
+  layout: SlideLayout
+  fontSize: number | null
   blankMode: BlankMode
   background: BackgroundSource | null
 }
@@ -76,7 +114,7 @@ export interface SemanticProgress {
 
 // Full surface of window.scriptureCaster (exposed by the preload bridge).
 export interface ScriptureCasterApi {
-  pushLive(verse: VerseMatch): void
+  pushLive(push: LiveSlidePush): void
   clearLive(): void
   setBlankMode(mode: BlankMode): void
   setBackground(source: BackgroundSource): Promise<void>

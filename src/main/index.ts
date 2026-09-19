@@ -15,11 +15,11 @@ import * as fs from "fs/promises";
 import { existsSync } from "fs";
 import {
   IPC,
-  type VerseMatch,
   type OutputState,
   type BlankMode,
   type BackgroundItem,
   type BackgroundSource,
+  type LiveSlidePush,
 } from "../shared/types";
 import {
   getChapter,
@@ -52,7 +52,10 @@ const metaPath = join(backgroundsDir, "meta.json");
 
 const outputState: OutputState = {
   live: false,
-  verse: null,
+  slide: null,
+  theme: "default",
+  layout: "single",
+  fontSize: null,
   blankMode: "none",
   background: null,
 };
@@ -253,15 +256,20 @@ app.whenReady().then(async () => {
   });
 
   // ---- Verse / blank IPC (unchanged) ----
-  ipcMain.on(IPC.VERSE_PUSH_LIVE, (_event, verse: VerseMatch) => {
+  ipcMain.on(IPC.VERSE_PUSH_LIVE, (_event, push: LiveSlidePush) => {
     outputState.live = true;
-    outputState.verse = verse;
+    outputState.slide = push.slide;
+    outputState.theme = push.theme;
+    outputState.layout = push.layout;
+    outputState.fontSize = push.fontSize;
     outputState.blankMode = "none";
     outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
   });
 
   ipcMain.on(IPC.VERSE_CLEAR, () => {
     outputState.live = false;
+    outputState.slide = null;
+    outputState.fontSize = null;
     outputWindow?.webContents.send(IPC.OUTPUT_STATE_CHANGED, outputState);
   });
 

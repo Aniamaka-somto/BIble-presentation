@@ -16,8 +16,8 @@ export function DgKeyModal() {
   }
 
   return (
-    <div className="alerts-overlay show">
-      <div className="alerts-modal">
+    <div className="modal-overlay">
+      <div className="modal box" role="dialog" aria-modal="true" aria-label="Deepgram API key">
         <h3>Deepgram API key</h3>
         <p>Needed to start real-time listening. Stored only for this session.</p>
         <input
@@ -25,29 +25,14 @@ export function DgKeyModal() {
           value={key}
           onChange={(e) => setKey(e.target.value)}
           placeholder="Paste your API key"
-          style={{
-            width: '100%',
-            background: 'var(--bg-1)',
-            border: '1px solid var(--line)',
-            borderRadius: '9px',
-            color: 'var(--text-hi)',
-            fontSize: '13.5px',
-            padding: '11px',
-            outline: 'none',
-            fontFamily: "'JetBrains Mono', monospace",
-          }}
         />
-        <div className="alerts-modal-actions">
-          <div className="btn btn-ghost" onClick={() => submit(null)}>
+        <div className="modal-actions">
+          <button className="btn-ghost" onClick={() => submit(null)}>
             Cancel
-          </div>
-          <div
-            className="btn"
-            style={{ background: 'var(--blue)', color: '#fff', border: 'none' }}
-            onClick={save}
-          >
+          </button>
+          <button className="btn-primary" onClick={save}>
             Save &amp; start
-          </div>
+          </button>
         </div>
       </div>
     </div>

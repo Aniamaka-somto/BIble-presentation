@@ -47,7 +47,6 @@ export function useDeepgram() {
   const reconnectAttempts = useOperator((s) => s.reconnectAttempts)
   const setStatus = useOperator((s) => s.setListeningStatus)
   const setReconnectAttempts = useOperator((s) => s.setReconnectAttempts)
-  const setTranscript = useOperator((s) => s.setTranscript)
 
   const statusRef = useRef(status)
   statusRef.current = status
@@ -139,8 +138,15 @@ export function useDeepgram() {
       const alt = data.channel?.alternatives?.[0]
       const transcript = alt?.transcript
       if (!transcript) return
-      setTranscript(transcript)
-      if (!data.is_final) return
+
+      const store = useOperator.getState()
+      if (!data.is_final) {
+        store.updateInterim(transcript)
+        return
+      }
+
+      store.updateInterim('')
+      commitFinal(store, transcript)
       utteranceRef.current = mergeFinalText(utteranceRef.current, transcript)
       const combined = utteranceRef.current
 
@@ -153,10 +159,10 @@ export function useDeepgram() {
           snippet: transcript.trim(),
           isTop: i === 0,
           isParaphrase: false,
-          translation: useOperator.getState().currentTranslation,
-          translationName: useOperator.getState().currentTranslation,
+          translation: store.currentTranslation,
+          translationName: store.currentTranslation,
         }
-        useOperator.getState().addDetection(input)
+        store.addDetection(input)
       })
 
       if (scoutTimerRef.current !== null) clearTimeout(scoutTimerRef.current)
@@ -190,7 +196,7 @@ export function useDeepgram() {
             useOperator.getState().addDetection(input)
           })
         })
-      }, 1200)
+      }, UTTERANCE_SILENCE_MS)
     }
 
     ws.onerror = (err) => {
@@ -205,7 +211,7 @@ export function useDeepgram() {
     attemptsRef.current = 0
     setReconnectAttempts(0)
     setStatus('listening')
-  }, [setStatus, setReconnectAttempts, setTranscript])
+  }, [setStatus, setReconnectAttempts])
 
   startRef.current = start
 
@@ -259,8 +265,6 @@ export function useDeepgram() {
     }
   }, [setReconnectAttempts, setStatus])
 
-  const transcript = useOperator((s) => s.transcript)
-
   const toggle = useCallback(() => {
     if (statusRef.current === 'idle') {
       startRef.current().catch((err: Error) => {
@@ -271,5 +275,16 @@ export function useDeepgram() {
     }
   }, [])
 
-  return { status, reconnectAttempts, transcript, toggle }
+  return { status, reconnectAttempts, toggle }
+}
+
+function commitFinal(
+  store: ReturnType<typeof useOperator.getState>,
+  text: string
+) {
+  const refs = parseExplicitReferences(text)
+  store.commitTranscriptFinal(
+    text.trim(),
+    refs.map((r) => ({ book: r.book, matchedText: r.matchedText }))
+  )
 }

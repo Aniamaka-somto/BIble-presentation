@@ -1,0 +1,57 @@
+/* Shared slide canvas — laid out once at 1920x1080, scaled to any box.
+   Identical across operator preview, operator live monitor, and output window. */
+.slide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+  --fs: 56px;
+}
+.slide-safe {
+  position: absolute;
+  inset: 100px 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.slide-flow {
+  width: 100%;
+  text-align: center;
+}
+.s-block + .s-block {
+  margin-top: calc(var(--fs) * 0.9);
+}
+.s-text {
+  font-family: var(--serif);
+  font-size: var(--fs);
+  line-height: 1.32;
+  color: #eef3fb;
+  text-wrap: balance;
+}
+.s-num {
+  font-family: var(--mono);
+  font-size: 0.45em;
+  line-height: 0;
+  vertical-align: super;
+  color: var(--accent);
+  margin-right: 0.3em;
+}
+.s-ref {
+  font-family: var(--mono);
+  font-size: max(22px, calc(var(--fs) * 0.34));
+  color: var(--accent);
+  margin-top: calc(var(--fs) * 0.45);
+  letter-spacing: 0.08em;
+}
+.monitor-empty {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.live-empty {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--text-faint);
+}

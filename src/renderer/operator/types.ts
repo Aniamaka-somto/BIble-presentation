@@ -1,15 +1,4 @@
-import type { BackgroundType, TranslationInfo } from '../../shared/types'
-
-export interface StageVerse {
-  n: number
-  endVerse?: number
-  text: string
-  ref: string
-  book: string
-  chapter: number
-}
-
-export type OutputMode = 'combined' | 'split'
+import type { Slide } from '../../shared/types'
 
 export type BlankMode = 'none' | 'logo' | 'black'
 
@@ -21,21 +10,29 @@ export type ListeningStatus =
   | 'offline'
   | 'error'
 
-export type LibraryTab = 'scripture' | 'songs' | 'media' | 'web' | 'themes'
+export type BrowserTab = 'book' | 'context'
 
-export type ScheduleIcon = 'music' | 'scripture' | 'slides'
-
-export interface ScheduleItem {
-  id: string
-  icon: ScheduleIcon
-  name: string
-  sub: string
-  live?: boolean
+export interface StageVerse {
+  n: number
+  endVerse?: number
+  text: string
+  ref: string
+  book: string
+  chapter: number
 }
 
-export interface BgSource {
-  type: BackgroundType
-  fileName: string
+export interface ScheduleEntry {
+  id: string
+  slide: Slide
+  src: string
+  order: number
+}
+
+export interface TranscriptLine {
+  id: string
+  text: string
+  final: boolean
+  refs: { book: string; matchedText: string }[]
 }
 
 export interface DetectionCard {
@@ -43,13 +40,13 @@ export interface DetectionCard {
   refStr: string
   tagText: string
   isParaphrase: boolean
-  isTop: boolean
   snippet: string
   book: string
   chapter: number
   verse: number
   translation: string
   score?: number
+  confPct: number
   timeLabel: string
 }
 
@@ -66,4 +63,13 @@ export interface DetectionInput {
   translationName?: string
 }
 
-export type { TranslationInfo }
+export interface VersePick {
+  ref: string
+  text: string
+}
+
+export interface ContextResult {
+  ref: string
+  text: string
+  score?: number
+}

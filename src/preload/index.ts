@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
-  IPC, type VerseMatch, type OutputState, type BlankMode,
+  IPC, type LiveSlidePush, type OutputState, type BlankMode,
   type BackgroundItem, type BackgroundSource, type TranslationInfo,
   type SemanticProgress,
 } from '../shared/types'
@@ -11,7 +11,7 @@ interface DesktopSource {
 }
 
 contextBridge.exposeInMainWorld('scriptureCaster', {
-  pushLive: (verse: VerseMatch) => ipcRenderer.send(IPC.VERSE_PUSH_LIVE, verse),
+  pushLive: (push: LiveSlidePush) => ipcRenderer.send(IPC.VERSE_PUSH_LIVE, push),
   clearLive: () => ipcRenderer.send(IPC.VERSE_CLEAR),
   setBlankMode: (mode: BlankMode) => ipcRenderer.send(IPC.SET_BLANK_MODE, mode),
   setBackground: (source: BackgroundSource) => ipcRenderer.invoke(IPC.SET_BACKGROUND, source),

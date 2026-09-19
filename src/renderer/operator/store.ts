@@ -2,16 +2,19 @@ import { create } from 'zustand'
 import { api } from './api'
 import type {
   StageVerse,
-  OutputMode,
   BlankMode,
   ListeningStatus,
-  LibraryTab,
-  ScheduleItem,
-  BgSource,
+  BrowserTab,
+  ScheduleEntry,
+  TranscriptLine,
   DetectionCard,
   DetectionInput,
+  VersePick,
+  ContextResult,
 } from './types'
-import type { BackgroundItem, BackgroundSource, TranslationInfo } from '../../shared/types'
+import type { Slide, BackgroundItem, BackgroundSource, TranslationInfo } from '../../shared/types'
+import { verseSlide, stackSlide } from './lib/slideBuild'
+import type { SlideFit } from '../shared/slide'
 
 export interface ChapterInfo {
   book: string
@@ -23,27 +26,33 @@ interface OperatorState {
   translations: TranslationInfo[]
   currentTranslation: string
 
-  // Chapter / filmstrip / staging
+  // Bible browser
   verseData: Record<number, StageVerse>
-  stagedVerse: StageVerse | null
-  liveVerse: StageVerse | null
   verseCount: number
   lastChapter: ChapterInfo | null
-  liveVerseNum: number | null
+  browserTab: BrowserTab
+  contextQuery: string
+  contextResults: ContextResult[]
+
+  // Cue list (schedule) + staging
+  schedule: ScheduleEntry[]
+  scheduledRefs: string[]
+  staged: Slide | null
+  stagedEntryId: string | null
+  stagedFit: SlideFit | null
+  live: Slide | null
+  liveEntryId: string | null
   isLive: boolean
 
-  // Output
-  outputMode: OutputMode
-  blankMode: BlankMode
-  clearOn: boolean
-  outputVisible: boolean
+  // Right monitor (output preview)
+  monitorSlide: Slide | null
 
-  // Left panel
-  activeTab: LibraryTab
-  schedule: ScheduleItem[]
-  activeScheduleId: string | null
-  scheduleTitle: string
-  scheduleRenamed: boolean
+  // Picks (stacking)
+  picks: VersePick[]
+
+  // Output
+  blankMode: BlankMode
+  outputVisible: boolean
 
   // Backgrounds
   backgrounds: BackgroundItem[]
@@ -51,7 +60,6 @@ interface OperatorState {
 
   // Assistant
   feed: DetectionCard[]
-  autoPush: boolean
 
   // Reading lock: suppresses paraphrase suggestions shortly after any push.
   lastPushAt: number | null
@@ -59,7 +67,7 @@ interface OperatorState {
   // Listening
   listeningStatus: ListeningStatus
   reconnectAttempts: number
-  transcript: string
+  transcriptLines: TranscriptLine[]
 
   // Modals
   alertsOpen: boolean
@@ -71,34 +79,42 @@ interface OperatorState {
   deleteTranslation: (id: string) => Promise<void>
   importTranslation: () => Promise<void>
 
-  loadChapter: (book: string, chapter: number, startLive?: number, translation?: string) => Promise<number>
-  loadAndStage: (book: string, chapter: number, verse: number, translation?: string) => Promise<number>
-  stageVerse: (num: number) => void
-  stepToVerse: (num: number) => void
-  navigateChapter: (dir: number) => Promise<number | undefined>
-  pushLive: () => void
+  loadChapter: (book: string, chapter: number, translation?: string) => Promise<void>
+  navigateChapter: (dir: number) => Promise<void>
+  stageBibleVerse: (book: string, chapter: number, verse: number, endVerse?: number, translation?: string) => Promise<Slide | null>
 
-  setOutputMode: (mode: OutputMode) => void
+  setBrowserTab: (tab: BrowserTab) => void
+  setContextQuery: (q: string) => void
+  runContextSearch: () => Promise<void>
+
+  addToSchedule: (slide: Slide, src: string) => void
+  removeFromSchedule: (id: string) => void
+  clearSchedule: () => void
+  setStaged: (slide: Slide, entryId?: string | null) => void
+  setStagedFit: (fit: SlideFit | null) => void
+  previewStaged: () => void
+  goLive: () => void
+
+  togglePick: (pick: VersePick) => void
+  clearPicks: () => void
+  stackPicks: () => void
+
   toggleBlank: (mode: Exclude<BlankMode, 'none'>) => void
-  toggleClear: () => void
   toggleOutputVisibility: () => void
-
-  setActiveTab: (tab: LibraryTab) => void
 
   loadBackgrounds: () => Promise<void>
   addBackground: () => Promise<void>
   deleteBackground: (id: string) => Promise<void>
   selectBackground: (src: BackgroundSource) => void
 
-  addSchedule: () => void
-  selectSchedule: (id: string) => void
-
   addDetection: (input: DetectionInput) => Promise<void>
-  toggleAutoPush: () => void
+  clearFeed: () => void
 
   setListeningStatus: (status: ListeningStatus) => void
   setReconnectAttempts: (n: number) => void
-  setTranscript: (text: string) => void
+  commitTranscriptFinal: (text: string, refs: { book: string; matchedText: string }[]) => void
+  updateInterim: (text: string) => void
+  clearTranscript: () => void
 
   setAlertsOpen: (open: boolean) => void
   sendAlert: (message: string) => void
@@ -108,8 +124,11 @@ interface OperatorState {
 }
 
 export const READING_LOCK_MS = 30000
+const MAX_TRANSCRIPT_LINES = 45
 
 let dgResolve: ((key: string | null) => void) | null = null
+
+let orderSeq = 0
 
 function nextId(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
@@ -121,50 +140,46 @@ function formatRef(book: string, chapter: number, startV: number, endV?: number)
   ).toUpperCase()
 }
 
-function formatVerseNum(n: number, endVerse?: number): string {
-  return endVerse ? `${n}\u2013${endVerse}` : String(n)
+function slideRefKey(slide: Slide): string {
+  return slide.refs.join('|')
 }
-
-const DEFAULT_SCHEDULE: ScheduleItem[] = [
-  { id: 's_open', icon: 'music', name: 'Opening worship', sub: '4 songs' },
-  { id: 's_sermon', icon: 'scripture', name: 'Sermon — Luke 1', sub: 'AI detection active', live: true },
-  { id: 's_close', icon: 'music', name: 'Closing worship', sub: '2 songs' },
-  { id: 's_ann', icon: 'slides', name: 'Announcements', sub: '3 slides' },
-]
 
 export const useOperator = create<OperatorState>((set, get) => ({
   translations: [{ id: 'KJV', name: 'KJV' }],
   currentTranslation: 'KJV',
 
   verseData: {},
-  stagedVerse: null,
-  liveVerse: null,
   verseCount: 0,
-  lastChapter: null,
-  liveVerseNum: null,
+  lastChapter: { book: 'Genesis', chapter: 1 },
+  browserTab: 'book',
+  contextQuery: '',
+  contextResults: [],
+
+  schedule: [],
+  scheduledRefs: [],
+  staged: null,
+  stagedEntryId: null,
+  stagedFit: null,
+  live: null,
+  liveEntryId: null,
   isLive: false,
 
-  outputMode: 'combined',
-  blankMode: 'none',
-  clearOn: false,
-  outputVisible: true,
+  monitorSlide: null,
 
-  activeTab: 'scripture',
-  schedule: DEFAULT_SCHEDULE,
-  activeScheduleId: 's_sermon',
-  scheduleTitle: 'Order of service',
-  scheduleRenamed: false,
+  picks: [],
+
+  blankMode: 'none',
+  outputVisible: true,
 
   backgrounds: [],
   activeBackground: null,
 
   feed: [],
-  autoPush: false,
   lastPushAt: null,
 
   listeningStatus: 'idle',
   reconnectAttempts: 0,
-  transcript: '',
+  transcriptLines: [],
 
   alertsOpen: false,
   dgKeyOpen: false,
@@ -189,15 +204,12 @@ export const useOperator = create<OperatorState>((set, get) => ({
 
   switchTranslation: async (id: string) => {
     if (get().currentTranslation === id) return
-    const { stagedVerse } = get()
-    if (stagedVerse) {
-      await get().loadAndStage(stagedVerse.book, stagedVerse.chapter, stagedVerse.n, id)
-    } else {
-      await get().loadChapter('Luke', 1, 17, id)
-    }
+    set({ currentTranslation: id })
+    const { lastChapter } = get()
+    if (lastChapter) await get().loadChapter(lastChapter.book, lastChapter.chapter, id)
   },
 
-  loadChapter: async (book, chapter, startLive = 1, translation) => {
+  loadChapter: async (book, chapter, translation) => {
     const s = get()
     const t = translation && translation !== s.currentTranslation ? translation : s.currentTranslation
     const verses = await api.getChapter(book, chapter, t)
@@ -216,114 +228,178 @@ export const useOperator = create<OperatorState>((set, get) => ({
       }
     }
 
-    let live = startLive
-    let staged = verseData[live]
-    if (!staged) {
-      const covered = Object.values(verseData).find((v) => v.n <= live && live <= (v.endVerse ?? v.n))
-      if (covered) live = covered.n
-      staged = verseData[live]
-    }
-    if (!staged) staged = Object.values(verseData)[0] ?? null
-
     set({
       verseData,
-      stagedVerse: staged,
-      liveVerse: null,
-      liveVerseNum: staged ? staged.n : null,
-      currentTranslation: t,
-      isLive: true,
       lastChapter: { book, chapter },
       verseCount: total || Object.keys(verseData).length,
+      browserTab: 'book',
+      currentTranslation: t,
+      picks: [],
     })
-    return live
-  },
-
-  loadAndStage: async (book, chapter, verse, translation) => {
-    const resolved = await get().loadChapter(book, chapter, verse, translation)
-    set({
-      liveVerseNum: null,
-      isLive: false,
-      stagedVerse: get().verseData[resolved] ?? null,
-    })
-    return resolved
-  },
-
-  stageVerse: (num) => {
-    const s = get()
-    const v = s.verseData[num]
-    if (!v) return
-    const wasLive = num === s.liveVerseNum
-    set({ stagedVerse: v, isLive: wasLive })
-  },
-
-  stepToVerse: (num) => {
-    const v = get().verseData[num]
-    if (!v) return
-    set({ stagedVerse: v })
   },
 
   navigateChapter: async (dir) => {
     const s = get()
-    if (!s.stagedVerse) return
+    if (!s.lastChapter) return
     const books = await api.getBookList(s.currentTranslation)
-    const curIdx = books.findIndex((b) => b.name === s.stagedVerse!.book)
+    const curIdx = books.findIndex((b) => b.name === s.lastChapter!.book)
     if (curIdx === -1) return
 
     const isNext = dir > 0
-    const newChapter = s.stagedVerse.chapter + dir
+    const newChapter = s.lastChapter.chapter + dir
 
     if (newChapter >= 1 && newChapter <= books[curIdx].chapters) {
-      const verse = isNext
-        ? 1
-        : (await api.getVerseCount(s.stagedVerse.book, newChapter, s.currentTranslation)) ?? 1
-      return get().loadAndStage(s.stagedVerse.book, newChapter, verse)
+      await get().loadChapter(s.lastChapter.book, newChapter)
     } else if (isNext) {
       const nextIdx = curIdx + 1 < books.length ? curIdx + 1 : 0
-      return get().loadAndStage(books[nextIdx].name, 1, 1)
+      await get().loadChapter(books[nextIdx].name, 1)
     } else {
       const prevIdx = curIdx - 1 >= 0 ? curIdx - 1 : books.length - 1
-      const lastChap = books[prevIdx].chapters
-      const lastVerse = (await api.getVerseCount(books[prevIdx].name, lastChap, s.currentTranslation)) ?? 1
-      return get().loadAndStage(books[prevIdx].name, lastChap, lastVerse)
+      await get().loadChapter(books[prevIdx].name, books[prevIdx].chapters)
     }
   },
 
-  pushLive: () => {
-    const { stagedVerse, currentTranslation } = get()
-    if (!stagedVerse) return
-    set({ liveVerseNum: stagedVerse.n, isLive: true, liveVerse: stagedVerse, blankMode: 'none', lastPushAt: Date.now() })
-    api.pushLive({
-      id: stagedVerse.ref,
-      book: stagedVerse.book,
-      chapter: stagedVerse.chapter,
-      verse: stagedVerse.n,
-      endVerse: stagedVerse.endVerse,
-      text: stagedVerse.text,
-      translation: currentTranslation,
-      method: 'explicit',
-      confidence: 1,
-      transcriptSnippet: '',
-      detectedAt: Date.now(),
+  stageBibleVerse: async (book, chapter, verse, endVerse, translation) => {
+    const s = get()
+    const t = translation && translation !== s.currentTranslation ? translation : s.currentTranslation
+    const verses = await api.getChapter(book, chapter, t)
+    const ve = endVerse ?? verse
+    const v = verses.find((x) => x.verse <= verse && verse <= (x.endVerse ?? x.verse))
+    if (!v) return null
+    const ref = formatRef(book, chapter, v.verse, v.endVerse ?? v.verse)
+    const slide = verseSlide(ref, v.text)
+    slide.refs = [formatRef(book, chapter, verse, ve)]
+    return slide
+  },
+
+  setBrowserTab: (browserTab) => set({ browserTab, picks: [] }),
+  setContextQuery: (contextQuery) => set({ contextQuery }),
+
+  runContextSearch: async () => {
+    const { contextQuery, currentTranslation } = get()
+    const query = contextQuery.trim()
+    if (!query) return
+    const [lex, sem] = await Promise.all([
+      api.searchVerses(query, currentTranslation).catch(() => []),
+      api
+        .paraphraseSearchAll(query, get().translations.map((tl) => tl.id))
+        .catch(() => []),
+    ])
+    const results: ContextResult[] = []
+    const seen = new Set<string>()
+    const add = (ref: string, text: string, score?: number) => {
+      if (seen.has(ref)) return
+      seen.add(ref)
+      results.push({ ref, text, score })
+    }
+    for (const r of sem.slice(0, 8)) {
+      const ref = formatRef(r.book, r.chapter, r.verse, r.endVerse)
+      add(ref, r.text, r.score)
+    }
+    for (const r of lex.slice(0, 8)) {
+      const ref = formatRef(r.book, r.chapter, r.verse, r.endVerse)
+      add(ref, r.text)
+    }
+    set({ contextResults: results, browserTab: 'context', picks: [] })
+  },
+
+  addToSchedule: (slide, src) => {
+    orderSeq++
+    const entry: ScheduleEntry = { id: nextId(), slide, src, order: orderSeq }
+    const refs = slide.refs.filter(Boolean)
+    set((s) => ({
+      schedule: [entry, ...s.schedule],
+      scheduledRefs: [...new Set([...s.scheduledRefs, ...refs])],
+      staged: slide,
+      stagedEntryId: entry.id,
+      stagedFit: null,
+    }))
+  },
+
+  removeFromSchedule: (id) => {
+    set((s) => {
+      const entry = s.schedule.find((e) => e.id === id)
+      const refs = entry ? slideRefKey(entry.slide).split('|').filter(Boolean) : []
+      const removed = s.schedule.filter((e) => e.id !== id)
+      const remaining = new Set(removed.flatMap((e) => e.slide.refs))
+      const scheduledRefs = s.scheduledRefs.filter((r) => remaining.has(r))
+      return {
+        schedule: removed,
+        scheduledRefs,
+        stagedEntryId: s.stagedEntryId === id ? null : s.stagedEntryId,
+        liveEntryId: s.liveEntryId === id ? null : s.liveEntryId,
+      }
     })
   },
 
-  setOutputMode: (outputMode) => set({ outputMode }),
+  clearSchedule: () =>
+    set({
+      schedule: [],
+      scheduledRefs: [],
+      stagedEntryId: null,
+      liveEntryId: null,
+    }),
+
+  setStaged: (slide, entryId) =>
+    set({ staged: slide, stagedEntryId: entryId ?? null, stagedFit: null }),
+
+  setStagedFit: (stagedFit) => set({ stagedFit }),
+
+  previewStaged: () => {
+    const { staged } = get()
+    if (staged) set({ monitorSlide: staged })
+  },
+
+  goLive: () => {
+    const { staged, stagedFit, currentTranslation, live } = get()
+    if (!staged) return
+    const push = {
+      slide: staged,
+      theme: staged.theme ?? 'default' as 'default',
+      layout: staged.layout ?? 'single' as 'single',
+      fontSize: stagedFit?.size ?? null,
+    }
+    set({
+      live: staged,
+      liveEntryId: get().stagedEntryId,
+      monitorSlide: staged,
+      isLive: true,
+      lastPushAt: Date.now(),
+      blankMode: 'none',
+    })
+    api.pushLive(push)
+  },
+
+  togglePick: (pick) => {
+    const { picks } = get()
+    const idx = picks.findIndex((p) => p.ref === pick.ref)
+    if (idx === -1) {
+      set({ picks: [...picks, pick].slice(-8) })
+    } else {
+      set({ picks: picks.filter((_, i) => i !== idx) })
+    }
+  },
+
+  clearPicks: () => set({ picks: [] }),
+
+  stackPicks: () => {
+    const { picks, browserTab } = get()
+    if (picks.length < 2) return
+    const slide = stackSlide(picks.map((p) => ({ ref: p.ref, text: p.text })))
+    if (!slide.refs.length) return
+    get().addToSchedule(slide, browserTab === 'context' ? 'Context search' : 'Manual')
+    set({ picks: [] })
+  },
+
   toggleBlank: (mode) => {
     const next = get().blankMode === mode ? 'none' : mode
     set({ blankMode: next })
     api.setBlankMode(next)
   },
-  toggleClear: () => {
-    const next = !get().clearOn
-    set({ clearOn: next })
-    api.clearLive()
-  },
   toggleOutputVisibility: () => {
     set((s) => ({ outputVisible: !s.outputVisible }))
     api.toggleOutputVisibility()
   },
-
-  setActiveTab: (activeTab) => set({ activeTab }),
 
   loadBackgrounds: async () => {
     const backgrounds = await api.getBackgrounds()
@@ -350,21 +426,6 @@ export const useOperator = create<OperatorState>((set, get) => ({
     api.setBackground(src)
   },
 
-  addSchedule: () => {
-    const { stagedVerse, schedule, scheduleRenamed, scheduleTitle } = get()
-    if (!stagedVerse) return
-    const title = scheduleRenamed ? scheduleTitle : 'Schedule'
-    const item: ScheduleItem = {
-      id: nextId(),
-      icon: 'scripture',
-      name: stagedVerse.ref,
-      sub: 'Scripture',
-    }
-    set({ schedule: [item, ...schedule], scheduleTitle: title, scheduleRenamed: true })
-  },
-
-  selectSchedule: (id) => set({ activeScheduleId: id }),
-
   addDetection: async (input) => {
     const { currentTranslation, feed } = get()
     const t = input.translation || currentTranslation
@@ -376,35 +437,65 @@ export const useOperator = create<OperatorState>((set, get) => ({
     const startV = verseObj.verse
     const endV = verseObj.endVerse ?? startV
     const translationName = input.translationName ?? t
+    const confPct = input.isParaphrase
+      ? Math.max(1, Math.round((input.score ?? 0) * 100))
+      : 100
     const card: DetectionCard = {
       id: nextId(),
-      refStr: formatRef(input.book, input.chapter, startV, endV).toUpperCase(),
+      refStr: formatRef(input.book, input.chapter, startV, endV),
       tagText: input.isParaphrase
         ? 'Paraphrase' + (input.score != null ? ' \u00B7 ' + Math.round(input.score * 100) + '%' : '')
         : 'Reference',
       isParaphrase: input.isParaphrase,
-      isTop: input.isTop,
       snippet: verseObj.text,
       book: input.book,
       chapter: input.chapter,
       verse: startV,
       translation: translationName,
       score: input.score,
-      timeLabel: 'JUST NOW',
+      confPct,
+      timeLabel: new Date().toTimeString().slice(0, 8),
     }
-    set({ feed: [card, ...feed] })
-
-    if (get().autoPush && input.isTop && !input.isParaphrase) {
-      await get().loadAndStage(card.book, card.chapter, card.verse, card.translation)
-      get().pushLive()
-    }
+    set({ feed: [card, ...feed].slice(0, 40) })
   },
 
-  toggleAutoPush: () => set((s) => ({ autoPush: !s.autoPush })),
+  clearFeed: () => set({ feed: [] }),
 
   setListeningStatus: (listeningStatus) => set({ listeningStatus }),
   setReconnectAttempts: (reconnectAttempts) => set({ reconnectAttempts }),
-  setTranscript: (transcript) => set({ transcript }),
+
+  commitTranscriptFinal: (text, refs) => {
+    set((s) => {
+      const lines = [...s.transcriptLines]
+      const last = lines[lines.length - 1]
+      if (last && !last.final) {
+        lines[lines.length - 1] = { ...last, text: text.trim(), final: true, refs }
+      } else {
+        lines.push({
+          id: nextId(),
+          text: text.trim(),
+          final: true,
+          refs,
+        })
+      }
+      return { transcriptLines: lines.slice(-MAX_TRANSCRIPT_LINES) }
+    })
+  },
+
+  updateInterim: (text) => {
+    set((s) => {
+      const lines = [...s.transcriptLines]
+      const last = lines[lines.length - 1]
+      if (last && !last.final) {
+        lines[lines.length - 1] = { ...last, text }
+      } else {
+        lines.push({ id: nextId(), text, final: false, refs: [] })
+      }
+      return { transcriptLines: lines.slice(-MAX_TRANSCRIPT_LINES) }
+    })
+  },
+
+  clearTranscript: () => set({ transcriptLines: [] }),
 
   setAlertsOpen: (alertsOpen) => set({ alertsOpen }),
   sendAlert: (message) => {
@@ -429,10 +520,3 @@ export const useOperator = create<OperatorState>((set, get) => ({
     set({ dgKeyOpen: false })
   },
 }))
-
-export { formatVerseNum }
-
-export function verseLabel(v: StageVerse | null, count: number): string {
-  if (!v) return ''
-  return 'verse ' + formatVerseNum(v.n, v.endVerse) + ' of ' + count
-}

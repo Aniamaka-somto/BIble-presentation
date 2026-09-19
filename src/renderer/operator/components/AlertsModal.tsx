@@ -18,26 +18,26 @@ export function AlertsModal() {
 
   return (
     <div
-      className="alerts-overlay show"
+      className="modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) setOpen(false)
       }}
     >
-      <div className="alerts-modal">
+      <div className="modal box" role="dialog" aria-modal="true" aria-label="Send an alert">
         <h3>Send an alert</h3>
         <p>Shows a message banner on the live output for a few seconds.</p>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="e.g. Nursery pickup — ticket #42"
+          placeholder="e.g. nursery pickup — ticket #42"
         />
-        <div className="alerts-modal-actions">
-          <div className="btn btn-ghost" onClick={() => setOpen(false)}>
+        <div className="modal-actions">
+          <button className="btn-ghost" onClick={() => setOpen(false)}>
             Cancel
-          </div>
-          <div className="btn" style={{ background: 'var(--blue)', color: '#fff', border: 'none' }} onClick={send}>
+          </button>
+          <button className="btn-primary" onClick={send}>
             Send alert
-          </div>
+          </button>
         </div>
       </div>
     </div>
